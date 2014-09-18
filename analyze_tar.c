@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         }
         else {
             while(1) {
-                printf("entry header offset: %d GB and %ld\n", GB_read, bytes_read);
+                printf("entry header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
 
                 //get filename
                 fread((void*)entryname, ENTRYNAMESIZE, 1, tarfile);
@@ -135,9 +135,17 @@ int main(int argc, char* argv[]) {
                     bytes_read = bytes_read + longtmp;
                 }
 
+                //end printed info with newline
+                printf("\n");
+
                 //check for end of archive
                 fread((void*)archive_end_check, sizeof(archive_end_check), 1, tarfile);
-                //TODO finish
+                if(memcmp(archive_end_check, archive_end, sizeof(archive_end)) == 0) {
+                    break; //1024 bytes of zeros mark end of archive
+                }
+                else {
+                    fseek(tarfile, (-1 * sizeof(archive_end_check)), SEEK_CUR); //move back 1024 bytes
+                }
             }
         }
     }
