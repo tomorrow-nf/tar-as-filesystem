@@ -11,7 +11,6 @@
 #define FILELENGTHFIELDSIZE (sizeof(char) * 12)
 #define USTARFIELDSIZE (sizeof(char) * 8)
 #define PREFIXSIZE (sizeof(char) * 155)
-#define BYTES_IN_GB 1073741824
 
 int main(int argc, char* argv[]) {
 
@@ -20,7 +19,13 @@ int main(int argc, char* argv[]) {
     long int bytes_read = 0; // total bytes read - (gigabytes read * bytes per gigabyte)
     char* tar_file_handle;   // the end of the filename (.tar .bz .xz .docx)
     char* tar_filename = "testarchive.tar"; //temporary, will equal argv[1] later
-    long int tmp; // temporary variable for calculations
+    long int longtmp; // temporary variable for calculations
+    long long int longlongtmp; //temporary variable for calculations
+
+    //create end of archive check
+    char archive_end_check[1024];
+    char archive_end[1024];
+    memset(archive_end, 0, sizeof(archive_end));
 
     //Tar file important info
     char* entryname = (char*) malloc(ENTRYNAMESIZE);                 // name of entry file
@@ -41,77 +46,99 @@ int main(int argc, char* argv[]) {
             printf("Unable to open file");
         }
         else {
-            printf("entry header offset: %d GB and %ld\n", GB_read, bytes_read);
+            while(1) {
+                printf("entry header offset: %d GB and %ld\n", GB_read, bytes_read);
 
-            //get filename
-            fread((void*)entryname, ENTRYNAMESIZE, 1, tarfile);
-            printf("entry name: %s\n", entryname);
-            bytes_read = bytes_read + ENTRYNAMESIZE;
+                //get filename
+                fread((void*)entryname, ENTRYNAMESIZE, 1, tarfile);
+                printf("entry name: %s\n", entryname);
+                bytes_read = bytes_read + ENTRYNAMESIZE;
 
-            //discard mode, uid, and gid (8 bytes each)
-            fread((void*)trashbuffer, (sizeof(char) * 24), 1, tarfile);
-            bytes_read = bytes_read + (sizeof(char) * 24);
+                //discard mode, uid, and gid (8 bytes each)
+                fread((void*)trashbuffer, (sizeof(char) * 24), 1, tarfile);
+                bytes_read = bytes_read + (sizeof(char) * 24);
 
-            //get length of file in bytes
-            fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
-            printf("file length string: %s\n", file_length_string);
-            file_length = strtolonglong(file_length_string);
-            printf("file length int: %lld\n", file_length);
-            bytes_read = bytes_read + FILELENGTHFIELDSIZE;
+                //get length of file in bytes
+                fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
+                printf("file length string: %s\n", file_length_string);
+                file_length = strtolonglong(file_length_string);
+                printf("file length int: %lld\n", file_length);
+                bytes_read = bytes_read + FILELENGTHFIELDSIZE;
 
-            //discard modify time and checksum (20 bytes)
-            fread((void*)trashbuffer, (sizeof(char) * 20), 1, tarfile);
-            bytes_read = bytes_read + (sizeof(char) * 20);
+                //discard modify time and checksum (20 bytes)
+                fread((void*)trashbuffer, (sizeof(char) * 20), 1, tarfile);
+                bytes_read = bytes_read + (sizeof(char) * 20);
 
-            //get link flag (1 byte)
-            fread((void*)(&link_flag), sizeof(char), 1, tarfile);
-            printf("link flag: %c\n", link_flag);
-            bytes_read = bytes_read + sizeof(char);
+                //get link flag (1 byte)
+                fread((void*)(&link_flag), sizeof(char), 1, tarfile);
+                printf("link flag: %c\n", link_flag);
+                bytes_read = bytes_read + sizeof(char);
 
-            //get linked filename (if flag set, otherwise this field is useless)
-            fread((void*)linkname, ENTRYNAMESIZE, 1, tarfile);
-            printf("link name: %s\n", linkname);
-            bytes_read = bytes_read + ENTRYNAMESIZE;
+                //get linked filename (if flag set, otherwise this field is useless)
+                fread((void*)linkname, ENTRYNAMESIZE, 1, tarfile);
+                printf("link name: %s\n", linkname);
+                bytes_read = bytes_read + ENTRYNAMESIZE;
 
-            //get ustar flag and version, ignore version in check
-            fread((void*)ustarflag, USTARFIELDSIZE, 1, tarfile);
-            printf("ustar flag: %s\n", ustarflag);
-            bytes_read = bytes_read + USTARFIELDSIZE;
+                //get ustar flag and version, ignore version in check
+                fread((void*)ustarflag, USTARFIELDSIZE, 1, tarfile);
+                printf("ustar flag: %s\n", ustarflag);
+                bytes_read = bytes_read + USTARFIELDSIZE;
 
-            // if flag is ustar get rest of fields, else we went into data, go back
-            if(strncmp(ustarflag, "ustar", 5) == 0) {
-                //discard ustar data (80 bytes)
-                fread((void*)trashbuffer, (sizeof(char) * 80), 1, tarfile);
-                bytes_read = bytes_read + (sizeof(char) * 80);
+                // if flag is ustar get rest of fields, else we went into data, go back
+                if(strncmp(ustarflag, "ustar", 5) == 0) {
+                    //discard ustar data (80 bytes)
+                    fread((void*)trashbuffer, (sizeof(char) * 80), 1, tarfile);
+                    bytes_read = bytes_read + (sizeof(char) * 80);
 
-                //get ustar file prefix (may be nothing but /0)
-                fread((void*)entryprefix, PREFIXSIZE, 1, tarfile);
-                printf("file prefix: %s\n", entryprefix);
-                bytes_read = bytes_read + PREFIXSIZE;
-            }
-            else {
-                fseek(tarfile, (-8), SEEK_CUR); //go back 8 bytes
-                bytes_read = bytes_read - 8;
-            }
+                    //get ustar file prefix (may be nothing but /0)
+                    fread((void*)entryprefix, PREFIXSIZE, 1, tarfile);
+                    printf("file prefix: %s\n", entryprefix);
+                    bytes_read = bytes_read + PREFIXSIZE;
+                }
+                else {
+                    fseek(tarfile, (-8), SEEK_CUR); //go back 8 bytes
+                    bytes_read = bytes_read - 8;
+                }
 
-            //skip rest of 512 byte block
-            tmp = 512 - (bytes_read % 512); //get bytes left till end of block
-            if(tmp != 0) {
-                fseek(tarfile, tmp, SEEK_CUR);
-                bytes_read = bytes_read + tmp;
-            }
+                //skip rest of 512 byte block
+                longtmp = 512 - (bytes_read % 512); //get bytes left till end of block
+                if(longtmp != 0) {
+                    fseek(tarfile, longtmp, SEEK_CUR);
+                    bytes_read = bytes_read + longtmp;
+                }
 
-            //print beginning point of data
-            printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
+                //reduce bytes read to below a gigabyte
+                if(bytes_read >= BYTES_IN_GB) {
+                    bytes_read = bytes_read - BYTES_IN_GB;
+                    GB_read = GB_read + 1;
+                }
 
-            fread((void*)trashbuffer, (sizeof(char) * 17), 1, tarfile);
-            printf("file contents: %s\n", (char*)trashbuffer);
+                //print beginning point of data
+                printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
             
+                //skip data
+                //SEEK_CUR = current position macro, already defined
+                if(file_length > BYTES_IN_GB) {
+                    longlongtmp = file_length;
+                    while(longlongtmp > BYTES_IN_GB) {
+                        fseek(tarfile, BYTES_IN_GB, SEEK_CUR);
+                        GB_read = GB_read + 1;
+                        longlongtmp = longlongtmp - BYTES_IN_GB;
+                    }
+                    longtmp = longlongtmp + (512 - (longlongtmp % 512));
+                    fseek(tarfile, longtmp, SEEK_CUR);
+                    bytes_read = bytes_read + longtmp;
+                }
+                else {
+                    longtmp = file_length + (512 - (file_length % 512));
+                    fseek(tarfile, longtmp, SEEK_CUR);
+                    bytes_read = bytes_read + longtmp;
+                }
 
-            //skip data
-            //SEEK_CUR = current position macro, already defined
-            //TODO 
-            //fseek(tarfile, Length_of_data, SEEK_CUR);
+                //check for end of archive
+                fread((void*)archive_end_check, sizeof(archive_end_check), 1, tarfile);
+                //TODO finish
+            }
         }
     }
     else {

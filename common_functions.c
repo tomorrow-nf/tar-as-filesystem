@@ -1,5 +1,7 @@
-#include "common_functions.h"
+#include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include "common_functions.h"
 
 /*
     converts a string like "0000014" to a long integer
@@ -38,3 +40,4 @@ long long int strtolonglong(char* string) {
 
     return total;
 }
+
