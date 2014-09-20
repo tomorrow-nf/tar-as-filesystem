@@ -140,6 +140,9 @@ int main(int argc, char* argv[]) {
                     fseek(tarfile, longtmp, SEEK_CUR);
                     bytes_read = bytes_read + longtmp;
                 }
+                else if(file_length == 0) {
+                    // do not skip any data
+                }
                 else {
                     longtmp = file_length + (512 - (file_length % 512));
                     fseek(tarfile, longtmp, SEEK_CUR);
