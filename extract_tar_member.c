@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
             printf("Unable to open file: %s\n", tar_filename);
         }
         else {
-                //TODO offset cannot be larger than the max value of a long int, seek 1 gb at a time until its lower than a GB
+            //TODO offset cannot be larger than the max value of a long int, seek 1 gb at a time until its lower than a GB
             fseek(tarfile, offset, SEEK_CUR); // Seek to the file's offset
             member = fopen(output, "w"); // Create a file to write to
             if(!member) {
