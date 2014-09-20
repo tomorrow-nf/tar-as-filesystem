@@ -22,9 +22,11 @@ int main(int argc, char* argv[]) {
     char archive_end[1024];
     memset(archive_end, 0, sizeof(archive_end));
 
+    char* tempsdf = (char*) malloc(90);
+
     //Tar file important info
     char* entryname = (char*) malloc(ENTRYNAMESIZE);                 // name of entry file
-    char* file_length_string = (char*) malloc(FILELENGTHFIELDSIZE);  // size of file in bytes (string)
+    char* file_length_string = (char*) malloc(FILELENGTHFIELDSIZE);  // size of file in bytes (octal string)
     long long int file_length;                                       // size of file in bytes (long int)
     void* trashbuffer = (void*) malloc(sizeof(char) * 200);          // for unused fields
     char link_flag;                                                  // flag indicating this is a file link
@@ -66,7 +68,7 @@ int main(int argc, char* argv[]) {
                 //get length of file in bytes
                 fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
                 printf("file length string: %s\n", file_length_string);
-                file_length = strtolonglong(file_length_string);
+                file_length = strtoll(file_length_string, NULL, 8);
                 printf("file length int: %lld\n", file_length);
                 bytes_read = bytes_read + FILELENGTHFIELDSIZE;
 
@@ -155,6 +157,7 @@ int main(int argc, char* argv[]) {
                 else {
                     fseek(tarfile, (-1 * sizeof(archive_end_check)), SEEK_CUR); //move back 1024 bytes
                 }
+                //scanf("%s", tempsdf);
             }
         }
     }
