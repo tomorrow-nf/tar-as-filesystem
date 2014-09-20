@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
 
                 // Build the query and submit it
                 char insQuery[500]; // insertion query buffer
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (%s, %s, %d, %ld, %s, %c, CURRENT_TIMESTAMP())", tar_filename, membername, GB_read, bytes_read, file_length_string link_flag);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (%s, %s, %d, %ld, %s, %c, CURRENT_TIMESTAMP())", tar_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
 				mysql_query(con, insQuery);
             
                 //skip data
