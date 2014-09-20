@@ -9,15 +9,15 @@
 
 
 int main(int argc, char* argv[]) {
-	/*TODO: Many of these values are currently hard-coded based on
-		analyze_tar output of testarchive.tar. Needs to be
-		updated in the future to accomodate SQL database
-	*/
+    /*TODO: Many of these values are currently hard-coded based on
+        analyze_tar output of testarchive.tar. Needs to be
+        updated in the future to accomodate SQL database
+    */
 
-	//char* tar_file_handle;  		 	// file type (tar, bz2, gz, xz)
+    //char* tar_file_handle;  		 	// file type (tar, bz2, gz, xz)
     char* tar_filename = argv[1]; 	// file to extract member from
-	//char* output = strcat("temp/", argv[2]);  // member of archive to extract
-	char* tar_file_handle = "tar";
+    //char* output = strcat("temp/", argv[2]);  // member of archive to extract
+    char* tar_file_handle = "tar";
     char* output = "temp/TEST2.TXT"; // Output directory
 
     long long int mem_length = 17; //TODO: get from database
@@ -43,17 +43,18 @@ int main(int argc, char* argv[]) {
             printf("Unable to open file: %s\n", tar_filename);
         }
         else {
-        	fseek(tarfile, offset, SEEK_CUR); // Seek to the file's offset
+                //TODO offset cannot be larger than the max value of a long int, seek 1 gb at a time until its lower than a GB
+            fseek(tarfile, offset, SEEK_CUR); // Seek to the file's offset
             member = fopen(output, "w"); // Create a file to write to
             if(!member) {
-	            printf("Unable to create file: %s\n", output);
-	        }
-	        else {
-	            char* write_buf = (char*) malloc(BLOCKSIZE);
-	            long int bytes_read = offset;
+                printf("Unable to create file: %s\n", output);
+            }
+            else {
+                char* write_buf = (char*) malloc(mem_length);
+                long int bytes_read = offset;
 
-	            // Copy the file by blocks
-	            if(mem_length > BYTES_IN_GB) {
+                // Copy the file by blocks
+                if(mem_length > BYTES_IN_GB) {
                     long long int longlongtmp = mem_length;
                     while(longlongtmp > BYTES_IN_GB) {
                         fseek(tarfile, BYTES_IN_GB, SEEK_CUR);
@@ -63,9 +64,9 @@ int main(int argc, char* argv[]) {
                     long int longtmp = longlongtmp + (512 - (longlongtmp % 512));
                     //fseek(tarfile, longtmp, SEEK_CUR);
                     while ((bytes_read = fread(write_buf, 1, sizeof(write_buf), tarfile)) < longtmp && bytes_read != 0){
-				    	fwrite(write_buf, 1, bytes_read, member);
-				    }
-				    printf("Copied file from %s to %s\n", tar_filename, output);
+                        fwrite(write_buf, 1, bytes_read, member);
+                    }
+                    printf("Copied file from %s to %s\n", tar_filename, output);
                 }
                 else if(mem_length == 0) {
                     // Nothing to copy
@@ -74,13 +75,13 @@ int main(int argc, char* argv[]) {
                 else {
                     longtmp = mem_length + (512 - (mem_length % 512));
                     while ((bytes_read = fread(write_buf, 1, sizeof(write_buf), tarfile)) < longtmp && bytes_read != 0){
-				    	fwrite(write_buf, 1, bytes_read, member);
-				    }
-				    printf("Copied file from %s to %s\n", tar_filename, output);
+                        fwrite(write_buf, 1, bytes_read, member);
+                    }
+                    printf("Copied file from %s to %s\n", tar_filename, output);
                 }
-			}
-		}
-	}
+            }
+        }
+    }
 }
 
 
