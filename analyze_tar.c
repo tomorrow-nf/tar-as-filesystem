@@ -7,11 +7,6 @@
 #include <stdlib.h>
 #include "common_functions.h"
 
-#define ENTRYNAMESIZE (sizeof(char) * 100)
-#define FILELENGTHFIELDSIZE (sizeof(char) * 12)
-#define USTARFIELDSIZE (sizeof(char) * 8)
-#define PREFIXSIZE (sizeof(char) * 155)
-
 int main(int argc, char* argv[]) {
 
     FILE* tarfile;
