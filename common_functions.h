@@ -6,6 +6,7 @@
 #define FILELENGTHFIELDSIZE (sizeof(char) * 12)
 #define USTARFIELDSIZE (sizeof(char) * 8)
 #define PREFIXSIZE (sizeof(char) * 155)
+#define BLOCKSIZE (sizeof(char) * 512)
 
 long long int strtolonglong(char* string);
 
