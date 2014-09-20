@@ -15,12 +15,12 @@
 int main(int argc, char* argv[]) {
 
     FILE* tarfile;
-    int GB_read = 0;         // number of gigabytes read so far
-    long int bytes_read = 0; // total bytes read - (gigabytes read * bytes per gigabyte)
-    char* tar_file_handle;   // the end of the filename (.tar .bz .xz .docx)
-    char* tar_filename = "testarchive.tar"; //temporary, will equal argv[1] later
-    long int longtmp; // temporary variable for calculations
-    long long int longlongtmp; //temporary variable for calculations
+    int GB_read = 0;         		// number of gigabytes read so far
+    long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
+    char* tar_file_handle;  		// file type (tar, bz2, gz, xz)
+    char* tar_filename = argv[1]; 	// file to analyze
+    long int longtmp; 				// temporary variable for calculations
+    long long int longlongtmp; 		// temporary variable for calculations
 
     //create end of archive check
     char archive_end_check[1024];
@@ -37,16 +37,26 @@ int main(int argc, char* argv[]) {
     char* ustarflag = (char*) malloc(USTARFIELDSIZE);                // field indicating newer ustar format
     char* entryprefix = (char*) malloc(PREFIXSIZE);                  // ustar includes a field for long names
 
-    //TODO set tar_file_handle
-    tar_file_handle = ".tar";
+    // Set file extension
+	tar_file_handle = strrchr(tar_filename, '.');
+	if (!tar_file_handle) {
+	    //TODO error if no extension given
+	    return 1;
+	} 
+	else {
+		tar_file_handle = tar_file_handle + 1;
+		// Save file extension. Validity will be checked later
+	}
 
-    if(strcmp(tar_file_handle, ".tar") == 0) {
+	// Uncompressed tar archive
+    if(strcmp(tar_file_handle, "tar") == 0) {
         tarfile = fopen(tar_filename, "r");
         if(!tarfile) {
-            printf("Unable to open file");
+            printf("Unable to open file: %s\n", tar_filename);
         }
         else {
             while(1) {
+            	// Evaluate the tar header
                 printf("entry header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
 
                 //get filename
@@ -100,6 +110,7 @@ int main(int argc, char* argv[]) {
                     bytes_read = bytes_read - 8;
                 }
 
+                // Analyze the archive contents
                 //skip rest of 512 byte block
                 longtmp = 512 - (bytes_read % 512); //get bytes left till end of block
                 if(longtmp != 0) {
