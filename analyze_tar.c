@@ -5,7 +5,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <mysql.h>
+#include <my_global.h>
 #include "common_functions.h"
+
+// TODO: MEMORY CLEANUP, VERY IMPORTANT
 
 int main(int argc, char* argv[]) {
 
@@ -25,14 +29,14 @@ int main(int argc, char* argv[]) {
     char* tempsdf = (char*) malloc(90);
 
     //Tar file important info
-    char* entryname = (char*) malloc(ENTRYNAMESIZE);                 // name of entry file
+    char* membername = (char*) malloc(MEMBERNAMESIZE);                 // name of member file
     char* file_length_string = (char*) malloc(FILELENGTHFIELDSIZE);  // size of file in bytes (octal string)
     long long int file_length;                                       // size of file in bytes (long int)
     void* trashbuffer = (void*) malloc(sizeof(char) * 200);          // for unused fields
     char link_flag;                                                  // flag indicating this is a file link
-    char* linkname = (char*) malloc(ENTRYNAMESIZE);                  // name of linked file
+    char* linkname = (char*) malloc(MEMBERNAMESIZE);                  // name of linked file
     char* ustarflag = (char*) malloc(USTARFIELDSIZE);                // field indicating newer ustar format
-    char* entryprefix = (char*) malloc(PREFIXSIZE);                  // ustar includes a field for long names
+    char* memberprefix = (char*) malloc(PREFIXSIZE);                  // ustar includes a field for long names
 
     // Set file extension
 	tar_file_handle = strrchr(tar_filename, '.');
@@ -45,6 +49,17 @@ int main(int argc, char* argv[]) {
 		// Save file extension. Validity will be checked later
 	}
 
+	// Initial database and table setup
+	// TODO: Build ArchiveList table. This will not be part of the analysis program.
+	// mysql_query(con, "CREATE TABLE IF NOT EXISTS ArchiveList (ArchiveName VARCHAR(50), ArchivePath VARCHAR(200), id INT)");
+	MYSQL *con = mysql_init(NULL);
+
+	mysql_query(con, "CREATE TABLE IF NOT EXISTS UncompTar (ArchiveName VARCHAR(50), MemberName VARCHAR(50), GBoffset INT, BYTEoffset BIGINT, LinkFlag CHAR(1), LastModified TIMESTAMP)");
+	//mysql_query(con, "CREATE TABLE bz2 (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
+	//mysql_query(con, "CREATE TABLE gzip (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
+	//mysql_query(con, "CREATE TABLE xz (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
+
+
 	// Uncompressed tar archive
     if(strcmp(tar_file_handle, "tar") == 0) {
         tarfile = fopen(tar_filename, "r");
@@ -52,14 +67,15 @@ int main(int argc, char* argv[]) {
             printf("Unable to open file: %s\n", tar_filename);
         }
         else {
+        	// TODO: Add this archive to the ArchiveList table
             while(1) {
             	// Evaluate the tar header
-                printf("entry header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
+                printf("member header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
 
                 //get filename
-                fread((void*)entryname, ENTRYNAMESIZE, 1, tarfile);
-                printf("entry name: %s\n", entryname);
-                bytes_read = bytes_read + ENTRYNAMESIZE;
+                fread((void*)membername, MEMBERNAMESIZE, 1, tarfile);
+                printf("member name: %s\n", membername);
+                bytes_read = bytes_read + MEMBERNAMESIZE;
 
                 //discard mode, uid, and gid (8 bytes each)
                 fread((void*)trashbuffer, (sizeof(char) * 24), 1, tarfile);
@@ -67,9 +83,9 @@ int main(int argc, char* argv[]) {
 
                 //get length of file in bytes
                 fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
-                printf("file length string: %s\n", file_length_string);
+                printf("file length (string): %s\n", file_length_string);
                 file_length = strtoll(file_length_string, NULL, 8);
-                printf("file length int: %lld\n", file_length);
+                printf("file length (int): %lld\n", file_length);
                 bytes_read = bytes_read + FILELENGTHFIELDSIZE;
 
                 //discard modify time and checksum (20 bytes)
@@ -82,9 +98,9 @@ int main(int argc, char* argv[]) {
                 bytes_read = bytes_read + sizeof(char);
 
                 //get linked filename (if flag set, otherwise this field is useless)
-                fread((void*)linkname, ENTRYNAMESIZE, 1, tarfile);
+                fread((void*)linkname, MEMBERNAMESIZE, 1, tarfile);
                 printf("link name: %s\n", linkname);
-                bytes_read = bytes_read + ENTRYNAMESIZE;
+                bytes_read = bytes_read + MEMBERNAMESIZE;
 
                 //get ustar flag and version, ignore version in check
                 fread((void*)ustarflag, USTARFIELDSIZE, 1, tarfile);
@@ -98,8 +114,8 @@ int main(int argc, char* argv[]) {
                     bytes_read = bytes_read + (sizeof(char) * 80);
 
                     //get ustar file prefix (may be nothing but /0)
-                    fread((void*)entryprefix, PREFIXSIZE, 1, tarfile);
-                    printf("file prefix: %s\n", entryprefix);
+                    fread((void*)memberprefix, PREFIXSIZE, 1, tarfile);
+                    printf("file prefix: %s\n", memberprefix);
                     bytes_read = bytes_read + PREFIXSIZE;
                 }
                 else {
@@ -123,6 +139,11 @@ int main(int argc, char* argv[]) {
 
                 //print beginning point of data
                 printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
+
+                // Build the query and submit it
+                char insQuery[500]; // insertion query buffer
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (%s, %s, %d, %ld, %c, CURRENT_TIMESTAMP())", tar_filename, membername, GB_read, bytes_read, link_flag);
+				mysql_query(con, insQuery);
             
                 //skip data
                 //SEEK_CUR = current position macro, already defined

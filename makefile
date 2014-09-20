@@ -13,10 +13,10 @@ common_functions.o: common_functions.c common_functions.h
 	gcc -c common_functions.c -o build/common_functions.o
 
 extract_tar_member.o: extract_tar_member.c common_functions.h
-	gcc -c extract_tar_member.c -o build/extract_tar_member.o
+	gcc -c `mysql_config --cflags` extract_tar_member.c -o build/extract_tar_member.o
 
 analyze_tar.o: analyze_tar.c common_functions.h
-	gcc -c analyze_tar.c -o build/analyze_tar.o
+	gcc -c `mysql_config --cflags` analyze_tar.c -o build/analyze_tar.o
 
 prepareDatabase.o: prepareDatabase.c
 	gcc -c `mysql_config --cflags` prepareDatabase.c -o build/prepareDatabase.o
