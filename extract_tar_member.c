@@ -20,10 +20,10 @@ int main(int argc, char* argv[]) {
     char* tar_file_handle = "tar";
 
     // database values
-    char* output = "temp/image.jpeg"; //TODO get from database
+    char* output = "temp/TEST1.txt"; //TODO get from database
     int gb_offset = 0;         	//TODO get from database
-    long int b_offset = 512; 	// TODO get from database
-    long long int mem_length = 2273; //TODO: get from database
+    long int b_offset = 10240; 	// TODO get from database
+    long long int mem_length = 15; //TODO: get from database
 
     // Initial declarations for the tar archive and output file
     FILE* tarfile;
