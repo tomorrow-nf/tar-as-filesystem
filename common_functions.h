@@ -11,5 +11,8 @@
 long long int strtolonglong(char* string);
 
 int analyze_tarfile(char* f_name);
+int analyze_bz2(char* f_name);
+int analyze_gzip(char* f_name);
+int analyze_xz(char* f_name);
 
 #endif

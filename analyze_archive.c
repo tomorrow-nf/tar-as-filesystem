@@ -14,10 +14,24 @@ int main(int argc, char* argv[]) {
 	char* file_handle;
 	int problem_variable;
 
+	// Check syntax
+	if (argc != 2){
+		printf("ERROR: Syntax\n"
+			"Expected: analyze_archive <archive file name>\n");
+		return 1;
+	}
+
 	// Set file extension
 	file_handle = strrchr(filename, '.');
 	if (!file_handle) {
-		printf("No file extention found\n");
+		printf("ERROR: No file extension on: %s\n"
+			"Archive must have an appropriate file extension\n"
+			"----------------------------------\n"
+			"- Uncompressed TAR   archive: .tar\n"
+			"- Compressed   Bzip2 archive: .bz2\n"
+			"- Compressed   Gzip  archive: .gz\n"
+			"- Compressed   XZ    archive: .xz\n"
+			"----------------------------------\n", filename);
 		return 1;
 	} 
 	else {
@@ -27,7 +41,30 @@ int main(int argc, char* argv[]) {
 
 	// Uncompressed tar archive
 	if(strcmp(file_handle, "tar") == 0) {
-		problem_variable = analyze_tarfile(filename);
+		problem_variable = analyze_tar(filename);
 	}
-	//else if(strcmp(tar_file_handle, "bz") == 0)
+	else if(strcmp(file_handle, "bz") == 0) {
+		problem_variable = analyze_bz2(filename);
+	}
+	/*
+	else if(strcmp(file_handle, "gz") == 0) {
+		problem_variable = analyze_gzip(filename);
+	}
+	else if(strcmp(file_handle, "xz") == 0) {
+		problem_variable = analyze_xz(filename);
+	}
+	*/
+	else {
+		printf("ERROR: Invalid file extension: %s\n"
+			"Archive must have an appropriate file extension\n"
+			"----------------------------------\n"
+			"- Uncompressed TAR   archive: .tar\n"
+			"- Compressed   Bzip2 archive: .bz2\n"
+			"- Compressed   Gzip  archive: .gz\n"
+			"- Compressed   XZ    archive: .xz\n"
+			"----------------------------------\n", file_handle);
+		return 1;
+	}
+
+	return problem_variable;
 }

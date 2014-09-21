@@ -11,8 +11,6 @@
 
 int main(int argc, char* argv[]) {
 
-	//TODO: MEMORY MANAGEMENT
-
 	// Initial database connection
 	MYSQL *con = mysql_init(NULL);
 	mysql_init(con);

@@ -1,5 +1,5 @@
 /*
-    Will accept a tar file name and print out the files in the archive as well as their
+    Will accept a tar.bz2 file name and print out the files in the archive as well as their
     byte offsets and sizes (in bytes).
 */
 #include <mysql.h>
@@ -9,17 +9,17 @@
 #include <stdlib.h>
 #include "common_functions.h"
 
-    int analyze_tar(char* f_name) {
+    int analyze_bz2(char* f_name) {
 
     FILE* tarfile;
 	int GB_read = 0;         		// number of gigabytes read so far
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_filename = f_name; 	// file to analyze
 	char* real_filename;            // the filename without any directory info in front of it
-	char* fullpath;             // the absolute path to the file
+	char* fullpath;             	// the absolute path to the file
 	long int longtmp; 				// temporary variable for calculations
 	long long int longlongtmp; 		// temporary variable for calculations
-	int dberror = 0;                  // indicate an error in analysis
+	int dberror = 0;                // indicate an error in analysis
 
 	//create end of archive check
 	char archive_end_check[1024];
