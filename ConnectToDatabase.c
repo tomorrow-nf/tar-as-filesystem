@@ -1,0 +1,3 @@
+/*
+    Connects to a mySQL database
+*/
