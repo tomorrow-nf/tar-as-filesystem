@@ -15,6 +15,18 @@ int main() {
 	}
 	else {
 		printf("Connection Successful\n");
+		MYSQL_RES* response = mysql_list_tables(&mysql, "%");
+		if(response != NULL) {
+
+			MYSQL_ROW row;
+			while(row = mysql_fetch_row(response)) {
+				puts(row[0]);
+			}
+			mysql_free_result(response);
+		}
+		else {
+			printf("Error listing tables");
+		}
 		mysql_close(&mysql);
 	}
 }
