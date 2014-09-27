@@ -49,15 +49,8 @@ int main(int argc, char* argv[]) {
 		// Save file extension. Validity will be checked later
 	}
 
-	// Initial database and table setup
-	// TODO: Build ArchiveList table. This will not be part of the analysis program.
-	// mysql_query(con, "CREATE TABLE IF NOT EXISTS ArchiveList (ArchiveName VARCHAR(50), ArchivePath VARCHAR(200), id INT)");
+	// connect to database
 	MYSQL *con = mysql_init(NULL);
-
-	mysql_query(con, "CREATE TABLE IF NOT EXISTS UncompTar (ArchiveName VARCHAR(50), MemberName VARCHAR(50), GBoffset INT, BYTEoffset BIGINT, LinkFlag CHAR(1), LastModified TIMESTAMP)");
-	//mysql_query(con, "CREATE TABLE bz2 (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
-	//mysql_query(con, "CREATE TABLE gzip (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
-	//mysql_query(con, "CREATE TABLE xz (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
 
 
 	// Uncompressed tar archive
