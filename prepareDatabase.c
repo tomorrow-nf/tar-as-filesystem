@@ -15,11 +15,11 @@ int main() {
 	char* createdatabase = "CREATE DATABASE Tarfiledb";
 
 	// table strings
-	char* archivetable = "ArchiveList"; // all tables follow: name
-	char* createarchivetable = ""; //                         creation string
-	int archivetable_exists = 0; //                            existence flag
+	char* archivetable = "ArchiveList"; // all tables follow: name, creation string, existence flag
+	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveName VARCHAR(255) PRIMARY KEY, ArchivePath VARCHAR(255))";
+	int archivetable_exists = 0;
 	char* basetar = "UncompTar";
-	char* createbasetar = "";
+	char* createbasetar = "CREATE TABLE UncompTar (ArchiveName VARCHAR(255) PRIMARY KEY, MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), LastModified TIMESTAMP)";
 	int basetar_exists = 0;
 
 	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection
@@ -81,18 +81,23 @@ int main() {
 
 		// create non-existant tables
 		if(!archivetable_exists) {
-			printf("archivetable does not exist\n");
+			printf("ArchiveList does not exist, creating\n");
+			if(mysql_query(&mysql, createarchivetable)) {
+				printf("Error: %s\n", mysql_error(&mysql));
+			}
 		}
 		if(!basetar_exists) {
-			printf("basetar does not exist\n");
+			printf("Uncomptar does not exist, creating\n");
+			if(mysql_query(&mysql, createbasetar)) {
+				printf("Error: %s\n", mysql_error(&mysql));
+			}
 		}
+		//TODO add more tables
 
 		mysql_close(&mysql);
 	}
 }
 
-// mysql_query(con, "CREATE TABLE IF NOT EXISTS ArchiveList (ArchiveName VARCHAR(50), ArchivePath VARCHAR(200), id INT)");
-	//mysql_query(con, "CREATE TABLE IF NOT EXISTS UncompTar (ArchiveName VARCHAR(50), MemberName VARCHAR(50), GBoffset INT, BYTEoffset BIGINT, LinkFlag CHAR(1), LastModified TIMESTAMP)");
 	//mysql_query(con, "CREATE TABLE bz2 (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
 	//mysql_query(con, "CREATE TABLE gzip (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
 	//mysql_query(con, "CREATE TABLE xz (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
