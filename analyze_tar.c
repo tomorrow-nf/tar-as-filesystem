@@ -18,6 +18,7 @@ int main(int argc, char* argv[]) {
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_file_handle;  		// file type (tar, bz2, gz, xz)
 	char* tar_filename = argv[1]; 	// file to analyze
+	char* real_filename;            // the filename without any directory info in front of it
 	long int longtmp; 				// temporary variable for calculations
 	long long int longlongtmp; 		// temporary variable for calculations
 
@@ -49,6 +50,15 @@ int main(int argc, char* argv[]) {
 		// Save file extension. Validity will be checked later
 	}
 
+	// get real filename
+	real_filename = strrchr(tar_filename, '/');
+	if (!real_filename) {
+		real_filename = tar_filename;
+	} 
+	else {
+		real_filename++;
+	}
+
 	// connect to database, begin a transaction
 	MYSQL *con = mysql_init(NULL);
 	mysql_init(con);
@@ -64,15 +74,15 @@ int main(int argc, char* argv[]) {
 	if(strcmp(tar_file_handle, "tar") == 0) {
 		tarfile = fopen(tar_filename, "r");
 		if(!tarfile) {
-		printf("Unable to open file: %s\n", tar_filename);
-        }
+			printf("Unable to open file: %s\n", tar_filename);
+		}
 		else {
 			// begin transaction and add this archive to the ArchiveList table
 			char insQuery[1000]; // insertion query buffer (we dont want current timestamp, we want the file's last modified timestamp)
 			if(mysql_query(con, "START TRANSACTION")) {
 				printf("Start Transaction error:\n%s\n", mysql_error(con));
 			}
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', 'temporary placeholder')", tar_filename);
+			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', 'temporary placeholder')", real_filename);
 			if(mysql_query(con, insQuery)) {
 				printf("Insert error:\n%s\n", mysql_error(con));
 			}		
@@ -150,7 +160,7 @@ int main(int argc, char* argv[]) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c', CURRENT_TIMESTAMP())", tar_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c', CURRENT_TIMESTAMP())", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 				}
@@ -194,6 +204,7 @@ int main(int argc, char* argv[]) {
 			if(mysql_query(con, "COMMIT")) {
 				printf("Commit error:\n%s\n", mysql_error(con));
 			}
+			fclose(tarfile);
 		}
 	}
 	else {
