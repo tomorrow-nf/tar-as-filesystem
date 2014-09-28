@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
 			if(mysql_query(con, "START TRANSACTION")) {
 				printf("Start Transaction error:\n%s\n", mysql_error(con));
 			}
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', 'temporary placeholder')", real_filename);
+			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', 'temporary placeholder', 'timestamp')", real_filename);
 			if(mysql_query(con, insQuery)) {
 				printf("Insert error:\n%s\n", mysql_error(con));
 			}		
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c', CURRENT_TIMESTAMP())", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 				}
