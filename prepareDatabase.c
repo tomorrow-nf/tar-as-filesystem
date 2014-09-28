@@ -19,7 +19,7 @@ int main() {
 	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveName VARCHAR(255) PRIMARY KEY, ArchivePath VARCHAR(255))";
 	int archivetable_exists = 0;
 	char* basetar = "UncompTar";
-	char* createbasetar = "CREATE TABLE UncompTar (ArchiveName VARCHAR(255) PRIMARY KEY, MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), LastModified TIMESTAMP)";
+	char* createbasetar = "CREATE TABLE UncompTar (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), LastModified TIMESTAMP, PRIMARY KEY (ArchiveName, MemberName))";
 	int basetar_exists = 0;
 
 	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection

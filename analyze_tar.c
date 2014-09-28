@@ -69,10 +69,13 @@ int main(int argc, char* argv[]) {
 		else {
 			// begin transaction and add this archive to the ArchiveList table
 			char insQuery[1000]; // insertion query buffer (we dont want current timestamp, we want the file's last modified timestamp)
-			mysql_query(con, "START TRANSACTION");
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES (%s, temporary placeholder)", tar_filename);
-			mysql_query(con, insQuery);
-		
+			if(mysql_query(con, "START TRANSACTION")) {
+				printf("Start Transaction error:\n%s\n", mysql_error(con));
+			}
+			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', 'temporary placeholder')", tar_filename);
+			if(mysql_query(con, insQuery)) {
+				printf("Insert error:\n%s\n", mysql_error(con));
+			}		
 		
 			while(1) {
 				// Evaluate the tar header
@@ -147,8 +150,10 @@ int main(int argc, char* argv[]) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (%s, %s, %d, %ld, %s, %c, CURRENT_TIMESTAMP())", tar_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
-				mysql_query(con, insQuery);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c', CURRENT_TIMESTAMP())", tar_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
+				if(mysql_query(con, insQuery)) {
+					printf("Insert error:\n%s\n", mysql_error(con));
+				}
             
 				//skip data
 				//SEEK_CUR = current position macro, already defined
@@ -186,7 +191,9 @@ int main(int argc, char* argv[]) {
 				//scanf("%s", tempsdf);
 			}
 			//the file has been read, commit the transation and close the connection
-			mysql_query(con, "COMMIT");
+			if(mysql_query(con, "COMMIT")) {
+				printf("Commit error:\n%s\n", mysql_error(con));
+			}
 		}
 	}
 	else {
