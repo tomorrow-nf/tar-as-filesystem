@@ -1,10 +1,10 @@
-all: analyze_tar extract_tar_member
+all: analyze_tar extract_tar_member prepareDatabase
 
 analyze_tar: analyze_tar.o common_functions.o
-	gcc build/analyze_tar.o build/common_functions.o -o build/analyze_tar
+	gcc -o build/analyze_tar build/analyze_tar.o build/common_functions.o `mysql_config --libs`
 
 extract_tar_member: extract_tar_member.o common_functions.o
-	gcc build/extract_tar_member.o build/common_functions.o -o build/extract_tar_member
+	gcc -o build/extract_tar_member build/extract_tar_member.o build/common_functions.o `mysql_config --libs`
 
 prepareDatabase: prepareDatabase.o
 	gcc -o build/prepareDatabase build/prepareDatabase.o `mysql_config --libs`
