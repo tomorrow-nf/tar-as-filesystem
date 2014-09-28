@@ -5,6 +5,7 @@
 #include <mysql.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <stdlib.h>
 #include "common_functions.h"
 
@@ -19,6 +20,7 @@ int main(int argc, char* argv[]) {
 	char* tar_file_handle;  		// file type (tar, bz2, gz, xz)
 	char* tar_filename = argv[1]; 	// file to analyze
 	char* real_filename;            // the filename without any directory info in front of it
+	char* fullpath;             // the absolute path to the file
 	long int longtmp; 				// temporary variable for calculations
 	long long int longlongtmp; 		// temporary variable for calculations
 
@@ -43,6 +45,13 @@ int main(int argc, char* argv[]) {
 	tar_file_handle = strrchr(tar_filename, '.');
 	if (!tar_file_handle) {
 		//TODO error if no extension given
+		free(tempsdf);
+		free(membername);
+		free(file_length_string);
+		free(trashbuffer);
+		free(linkname);
+		free(ustarflag);
+		free(memberprefix);
 		return 1;
 	} 
 	else {
@@ -58,6 +67,7 @@ int main(int argc, char* argv[]) {
 	else {
 		real_filename++;
 	}
+	fullpath = realpath(tar_filename, NULL);
 
 	// connect to database, begin a transaction
 	MYSQL *con = mysql_init(NULL);
@@ -66,6 +76,14 @@ int main(int argc, char* argv[]) {
 		printf("Connection Failure: %s\n", mysql_error(con));
 		//exit, no point
 		mysql_close(con);
+		free(tempsdf);
+		free(membername);
+		free(file_length_string);
+		free(trashbuffer);
+		free(linkname);
+		free(ustarflag);
+		free(memberprefix);
+		free(fullpath);
 		return 1;
 	}
 
@@ -82,7 +100,7 @@ int main(int argc, char* argv[]) {
 			if(mysql_query(con, "START TRANSACTION")) {
 				printf("Start Transaction error:\n%s\n", mysql_error(con));
 			}
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', 'temporary placeholder', 'timestamp')", real_filename);
+			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', '%s', 'timestamp')", real_filename, fullpath);
 			if(mysql_query(con, insQuery)) {
 				printf("Insert error:\n%s\n", mysql_error(con));
 			}		
@@ -221,4 +239,5 @@ int main(int argc, char* argv[]) {
 	free(linkname);
 	free(ustarflag);
 	free(memberprefix);
+	free(fullpath);
 }
