@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
 	char* fullpath;             // the absolute path to the file
 	long int longtmp; 				// temporary variable for calculations
 	long long int longlongtmp; 		// temporary variable for calculations
+	int dberror = 0;                  // indicate an error in analysis
 
 	//create end of archive check
 	char archive_end_check[1024];
@@ -95,14 +96,77 @@ int main(int argc, char* argv[]) {
 			printf("Unable to open file: %s\n", tar_filename);
 		}
 		else {
-			// begin transaction and add this archive to the ArchiveList table
+			// begin transaction and check if this archive exists
 			char insQuery[1000]; // insertion query buffer (we dont want current timestamp, we want the file's last modified timestamp)
 			if(mysql_query(con, "START TRANSACTION")) {
 				printf("Start Transaction error:\n%s\n", mysql_error(con));
+				fclose(tarfile);
+				mysql_close(con);
+				free(tempsdf);
+				free(membername);
+				free(file_length_string);
+				free(trashbuffer);
+				free(linkname);
+				free(ustarflag);
+				free(memberprefix);
+				free(fullpath);
+				return 1;
 			}
+
+			//check if file already exists and ask for permission to overwrite and remove references
+			sprintf(insQuery, "SELECT * from ArchiveList WHERE ArchiveName = '%s'", real_filename);
+			mysql_query(con, insQuery);
+			MYSQL_RES* result = mysql_store_result(con);
+			if(mysql_num_rows(result) == 0) {
+				printf("File does not exist");
+				//file foes not exist, do nothing
+				mysql_free_result(result);
+			}
+			else {
+				MYSQL_ROW row = mysql_fetch_row(result);
+				mysql_free_result(result);
+				char* yes_no = (char*) malloc(sizeof(char) * 20);
+				sprintf(yes_no, "bad"); //prime with bad answer
+				while(strcmp(yes_no, "y") && strcmp(yes_no, "Y") && strcmp(yes_no, "n") && strcmp(yes_no, "N")) {
+					printf("File analysis already exists, overwrite[Y/N]: ");
+					scanf("%s", yes_no);
+				}
+				// if N exit, if Y overwrite
+				if(!strcmp(yes_no, "N") || !strcmp(yes_no, "n")) {
+					if(mysql_query(con, "ROLLBACK")) {
+						printf("Rollback error:\n%s\n", mysql_error(con));
+					}
+					fclose(tarfile);
+					mysql_close(con);
+					free(tempsdf);
+					free(membername);
+					free(file_length_string);
+					free(trashbuffer);
+					free(linkname);
+					free(ustarflag);
+					free(memberprefix);
+					free(fullpath);
+					return 1;
+				}
+				else {
+					sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
+					if(mysql_query(con, insQuery)) {
+						printf("Delete error:\n%s\n", mysql_error(con));
+						dberror = 1;
+					}
+					sprintf(insQuery, "DELETE FROM UncompTar WHERE ArchiveName = '%s'", real_filename);
+					if(mysql_query(con, insQuery)) {
+						printf("Delete error:\n%s\n", mysql_error(con));
+						dberror = 1;
+					}
+				}
+			}
+			
+			// file is not in database or it has been cleared from database
 			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', '%s', 'timestamp')", real_filename, fullpath);
 			if(mysql_query(con, insQuery)) {
 				printf("Insert error:\n%s\n", mysql_error(con));
+				dberror = 1;
 			}		
 		
 			while(1) {
@@ -181,6 +245,7 @@ int main(int argc, char* argv[]) {
 				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
+					dberror = 1;
 				}
             
 				//skip data
@@ -219,14 +284,21 @@ int main(int argc, char* argv[]) {
 				//scanf("%s", tempsdf);
 			}
 			//the file has been read, commit the transation and close the connection
-			if(mysql_query(con, "COMMIT")) {
-				printf("Commit error:\n%s\n", mysql_error(con));
+			if(dberror == 1) {
+				if(mysql_query(con, "ROLLBACK")) {
+					printf("Rollback error:\n%s\n", mysql_error(con));
+				}
+			}
+			else {
+				if(mysql_query(con, "COMMIT")) {
+					printf("Commit error:\n%s\n", mysql_error(con));
+				}
 			}
 			fclose(tarfile);
 		}
 	}
 	else {
-		//TODO error
+		//TODO error, this is not an uncompressed tar file
 	}
 	//close database connection
 	mysql_close(con);

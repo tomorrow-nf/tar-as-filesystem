@@ -58,11 +58,14 @@ int main(int argc, char* argv[]) {
 	long long int longlongtmp;
 	long int longtmp;
 	char queryBuf[1000]; // query buffer
+	MYSQL_ROW row; //row to store query results
 
 	// check if file exists
 	printf("Checking if file exists\n");
 	sprintf(queryBuf, "SELECT * from ArchiveList WHERE ArchiveName = '%s'", tar_filename);
-	mysql_query(con, queryBuf);
+	if(mysql_query(con, queryBuf)) {
+		printf("Select error error:\n%s\n", mysql_error(con));
+	}
 	MYSQL_RES* result = mysql_store_result(con);
 	if(mysql_num_rows(result) == 0) {
 		printf("The archive file does not exist\n");
@@ -94,17 +97,23 @@ int main(int argc, char* argv[]) {
 		else {
 			// Query the offsets and member file length from the database
 			sprintf(queryBuf, "SELECT GBoffset from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
-			mysql_query(con, queryBuf);
+			if(mysql_query(con, queryBuf)) {
+				printf("Select error:\n%s\n", mysql_error(con));
+			}
 			result = mysql_store_result(con);
-			MYSQL_ROW row = mysql_fetch_row(result);
+			row = mysql_fetch_row(result);
 			gb_offset = atoi(row[0]);
+			printf("GB offset: %d\n", gb_offset); //DEBUG
 			mysql_free_result(result);
 
 			sprintf(queryBuf, "SELECT BYTEoffset from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
-			mysql_query(con, queryBuf);
+			if(mysql_query(con, queryBuf)) {
+				printf("Select error:\n%s\n", mysql_error(con));
+			}
 			result = mysql_store_result(con);
 			row = mysql_fetch_row(result);
 			b_offset = strtol(row[0], NULL, 10);
+			printf("b_offset: %ld\n", b_offset); //DEBUG
 			mysql_free_result(result);
 
 			// Seek to the file's offset
@@ -123,6 +132,7 @@ int main(int argc, char* argv[]) {
 				free(output);
 				free(fullpath);
 				mysql_close(con);
+				fclose(tarfile);
 				return 1;
 			}
 			else {
@@ -130,10 +140,14 @@ int main(int argc, char* argv[]) {
 
 				// Query the member file size
 				printf(queryBuf, "SELECT MemberLength from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
-				mysql_query(con, queryBuf);
+				if(mysql_query(con, queryBuf)) {
+					printf("Select error:\n%s\n", mysql_error(con));
+				}
 				result = mysql_store_result(con);
 				row = mysql_fetch_row(result);
 				mem_length = strtoll(row[0], NULL, 8);
+				printf("mem_length string: %s", row[0]);
+				printf("mem_length: %lld\n", mem_length); //DEBUG
 				mysql_free_result(result);
 
 				// Copy the file by blocks
