@@ -96,24 +96,20 @@ int main(int argc, char* argv[]) {
 		}
 		else {
 			// Query the offsets and member file length from the database
-			sprintf(queryBuf, "SELECT GBoffset from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
+			sprintf(queryBuf, "SELECT * from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
 			if(mysql_query(con, queryBuf)) {
 				printf("Select error:\n%s\n", mysql_error(con));
 			}
 			result = mysql_store_result(con);
 			row = mysql_fetch_row(result);
-			gb_offset = atoi(row[0]);
+			gb_offset = atoi(row[2]);
 			printf("GB offset: %d\n", gb_offset); //DEBUG
-			mysql_free_result(result);
-
-			sprintf(queryBuf, "SELECT BYTEoffset from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
-			if(mysql_query(con, queryBuf)) {
-				printf("Select error:\n%s\n", mysql_error(con));
-			}
-			result = mysql_store_result(con);
-			row = mysql_fetch_row(result);
-			b_offset = strtol(row[0], NULL, 10);
+			b_offset = strtol(row[3], NULL, 10);
 			printf("b_offset: %ld\n", b_offset); //DEBUG
+			mem_length = strtoll(row[4], NULL, 8);
+			printf("mem_length string: %s\n", row[4]); //DEBUG
+			printf("mem_length: %lld\n", mem_length); //DEBUG
+			
 			mysql_free_result(result);
 
 			// Seek to the file's offset
@@ -137,18 +133,6 @@ int main(int argc, char* argv[]) {
 			}
 			else {
 				long long int bytes_read = 0;
-
-				// Query the member file size
-				printf(queryBuf, "SELECT MemberLength from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
-				if(mysql_query(con, queryBuf)) {
-					printf("Select error:\n%s\n", mysql_error(con));
-				}
-				result = mysql_store_result(con);
-				row = mysql_fetch_row(result);
-				mem_length = strtoll(row[0], NULL, 8);
-				printf("mem_length string: %s", row[0]);
-				printf("mem_length: %lld\n", mem_length); //DEBUG
-				mysql_free_result(result);
 
 				// Copy the file by blocks
 				printf("Copying the file\n");
