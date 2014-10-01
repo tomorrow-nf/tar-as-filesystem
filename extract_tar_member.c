@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 	// TODO: This is copied from analyze_tar, we can probably combine them later
 	char* tar_file_handle = strrchr(tar_filename, '.');
 	if (!tar_file_handle) {
-		//TODO error if no extension given
+		printf("no file handle given\n");
 		return 1;
 	} 
 	else {
@@ -101,6 +101,16 @@ int main(int argc, char* argv[]) {
 				printf("Select error:\n%s\n", mysql_error(con));
 			}
 			result = mysql_store_result(con);
+			if(mysql_num_rows(result) == 0) {
+				printf("The desired file does not exist\n");
+				mysql_free_result(result);
+				free(write_buf);
+				free(fullpath);
+				free(output);
+				mysql_close(con);
+				return 1;
+		
+			}
 			row = mysql_fetch_row(result);
 			gb_offset = atoi(row[2]);
 			printf("GB offset: %d\n", gb_offset); //DEBUG
