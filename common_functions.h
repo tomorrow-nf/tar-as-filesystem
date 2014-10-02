@@ -10,4 +10,6 @@
 
 long long int strtolonglong(char* string);
 
+int analyze_tarfile(char* f_name);
+
 #endif

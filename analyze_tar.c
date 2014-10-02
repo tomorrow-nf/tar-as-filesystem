@@ -12,13 +12,13 @@
 // TODO: MEMORY CLEANUP, VERY IMPORTANT
 // Memory cleanup done
 
-int main(int argc, char* argv[]) {
+int analyze_tarfile(char* f_name) {
 
 	FILE* tarfile;
 	int GB_read = 0;         		// number of gigabytes read so far
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_file_handle;  		// file type (tar, bz2, gz, xz)
-	char* tar_filename = argv[1]; 	// file to analyze
+	char* tar_filename = f_name; 	// file to analyze
 	char* real_filename;            // the filename without any directory info in front of it
 	char* fullpath;             // the absolute path to the file
 	long int longtmp; 				// temporary variable for calculations
@@ -245,27 +245,40 @@ int main(int argc, char* argv[]) {
 				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
+					printf("%s\n", insQuery);
 					dberror = 1;
 				}
             
 				//skip data
 				//SEEK_CUR = current position macro, already defined
-				if(file_length > BYTES_IN_GB) {
+				if(file_length >= BYTES_IN_GB) {
 					longlongtmp = file_length;
-					while(longlongtmp > BYTES_IN_GB) {
+					while(longlongtmp >= BYTES_IN_GB) {
 						fseek(tarfile, BYTES_IN_GB, SEEK_CUR);
 						GB_read = GB_read + 1;
 						longlongtmp = longlongtmp - BYTES_IN_GB;
 					}
-					longtmp = longlongtmp + (512 - (longlongtmp % 512));
-					fseek(tarfile, longtmp, SEEK_CUR);
-					bytes_read = bytes_read + longtmp;
+					if(longlongtmp > 0) {
+						if((longlongtmp % 512) != 0) {
+							longtmp = longlongtmp + (512 - (longlongtmp % 512));
+						}
+						else {
+							longtmp = longlongtmp;
+						}
+						fseek(tarfile, longtmp, SEEK_CUR);
+						bytes_read = bytes_read + longtmp;
+					}
 				}
 				else if(file_length == 0) {
 					// do not skip any data
 				}
 				else {
-					longtmp = file_length + (512 - (file_length % 512));
+					if((file_length % 512) != 0) {
+						longtmp = file_length + (512 - (file_length % 512));
+					}
+					else {
+						longtmp = file_length;
+					}
 					fseek(tarfile, longtmp, SEEK_CUR);
 					bytes_read = bytes_read + longtmp;
 				}
@@ -304,7 +317,19 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	else {
-		//TODO error, this is not an uncompressed tar file
+		printf("this is not an uncompressed tar file\n");
+		mysql_close(con);
+		free(tempsdf);
+		free(membername);
+		free(file_length_string);
+		free(trashbuffer);
+		free(linkname);
+		free(ustarflag);
+		free(memberprefix);
+		free(fullpath);
+
+		return 1;
+	
 	}
 	//close database connection
 	mysql_close(con);
@@ -318,4 +343,6 @@ int main(int argc, char* argv[]) {
 	free(ustarflag);
 	free(memberprefix);
 	free(fullpath);
+
+	return 0;
 }
