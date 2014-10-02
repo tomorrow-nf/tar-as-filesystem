@@ -288,10 +288,16 @@ int main(int argc, char* argv[]) {
 				if(mysql_query(con, "ROLLBACK")) {
 					printf("Rollback error:\n%s\n", mysql_error(con));
 				}
+				else {
+					printf("Entries rolled back\n");
+				}
 			}
 			else {
 				if(mysql_query(con, "COMMIT")) {
 					printf("Commit error:\n%s\n", mysql_error(con));
+				}
+				else {
+					printf("Entries committed\n");
 				}
 			}
 			fclose(tarfile);
