@@ -9,9 +9,9 @@
 #include <stdlib.h>
 #include "common_functions.h"
 
-    int analyze_bz2(char* f_name) {
+int analyze_bz2(char* f_name) {
 
-    FILE* tarfile;
+	FILE* tarfile;
 	int GB_read = 0;         		// number of gigabytes read so far
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_filename = f_name; 	// file to analyze
@@ -68,11 +68,11 @@
 	}
 
 
-  tarfile = fopen(tar_filename, "r");
-  if(!tarfile) {
-     printf("Unable to open file: %s\n", tar_filename);
- }
- else {
+	tarfile = fopen(tar_filename, "r");
+	if(!tarfile) {
+		printf("Unable to open file: %s\n", tar_filename);
+	}
+	else {
 			// begin transaction and check if this archive exists
 			char insQuery[1000]; // insertion query buffer (we dont want current timestamp, we want the file's last modified timestamp)
 			if(mysql_query(con, "START TRANSACTION")) {
@@ -294,17 +294,17 @@
 		}
 
 	//close database connection
-       mysql_close(con);
+		mysql_close(con);
 
 	//free memory
-       free(tempsdf);
-       free(membername);
-       free(file_length_string);
-       free(trashbuffer);
-       free(linkname);
-       free(ustarflag);
-       free(memberprefix);
-       free(fullpath);
+		free(tempsdf);
+		free(membername);
+		free(file_length_string);
+		free(trashbuffer);
+		free(linkname);
+		free(ustarflag);
+		free(memberprefix);
+		free(fullpath);
 
-       return 0;
-   }
+		return 0;
+	}

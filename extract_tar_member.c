@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
 				free(output);
 				mysql_close(con);
 				return 1;
-		
+
 			}
 			row = mysql_fetch_row(result);
 			gb_offset = atoi(row[2]);

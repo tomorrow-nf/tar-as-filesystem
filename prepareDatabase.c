@@ -21,6 +21,14 @@ int main() {
 	char* basetar = "UncompTar";
 	char* createbasetar = "CREATE TABLE UncompTar (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
 	int basetar_exists = 0;
+	char* createcompbz2 = "CREATE TABLE CompBzip2 (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	int compbz2_exists = 0;
+	/*
+	char* createcompgzip = "CREATE TABLE CompGzip (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	int compgzip_exists = 0;
+	char* createcompxz = "CREATE TABLE CompXZ (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	int compxz_exists = 0;
+	*/
 
 	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection
 
@@ -71,6 +79,7 @@ int main() {
 			while(row = mysql_fetch_row(response)) {
 				if(strcmp(row[0], archivetable) == 0) archivetable_exists = 1;
 				if(strcmp(row[0], basetar) == 0) basetar_exists = 1;
+				if(strcmp(row[0], compbz2) == 0) compbz2_exists = 1;
 				//TODO add more tables
 			}
 			mysql_free_result(response);
@@ -87,8 +96,14 @@ int main() {
 			}
 		}
 		if(!basetar_exists) {
-			printf("Uncomptar does not exist, creating\n");
+			printf("UncompTar does not exist, creating\n");
 			if(mysql_query(&mysql, createbasetar)) {
+				printf("Error: %s\n", mysql_error(&mysql));
+			}
+		}
+		if(!compbz2_exists) {
+			printf("CompBzip2 does not exist, creating\n");
+			if(mysql_query(&mysql, createcompbz2)) {
 				printf("Error: %s\n", mysql_error(&mysql));
 			}
 		}
@@ -97,7 +112,3 @@ int main() {
 		mysql_close(&mysql);
 	}
 }
-
-	//mysql_query(con, "CREATE TABLE bz2 (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
-	//mysql_query(con, "CREATE TABLE gzip (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
-	//mysql_query(con, "CREATE TABLE xz (ArchiveName VARCHAR(50), MemberName VARCHAR(50), )");
