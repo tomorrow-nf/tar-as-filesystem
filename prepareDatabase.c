@@ -18,14 +18,20 @@ int main() {
 	char* archivetable = "ArchiveList"; // all tables follow: name, creation string, existence flag
 	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveName VARCHAR(255) PRIMARY KEY, ArchivePath VARCHAR(5000), Timestamp VARCHAR(40)) ENGINE=InnoDB";
 	int archivetable_exists = 0;
+
 	char* basetar = "UncompTar";
 	char* createbasetar = "CREATE TABLE UncompTar (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
 	int basetar_exists = 0;
+/*
+	char* basetar = "CompBzip2";
 	char* createcompbz2 = "CREATE TABLE CompBzip2 (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
 	int compbz2_exists = 0;
-	/*
+	
+	char* basetar = "CompGzip";
 	char* createcompgzip = "CREATE TABLE CompGzip (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
 	int compgzip_exists = 0;
+
+	char* basetar = "CompXZ";
 	char* createcompxz = "CREATE TABLE CompXZ (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
 	int compxz_exists = 0;
 	*/
@@ -79,7 +85,7 @@ int main() {
 			while(row = mysql_fetch_row(response)) {
 				if(strcmp(row[0], archivetable) == 0) archivetable_exists = 1;
 				if(strcmp(row[0], basetar) == 0) basetar_exists = 1;
-				if(strcmp(row[0], compbz2) == 0) compbz2_exists = 1;
+				//if(strcmp(row[0], compbz2) == 0) compbz2_exists = 1;
 				//TODO add more tables
 			}
 			mysql_free_result(response);
@@ -101,12 +107,12 @@ int main() {
 				printf("Error: %s\n", mysql_error(&mysql));
 			}
 		}
-		if(!compbz2_exists) {
+		/*if(!compbz2_exists) {
 			printf("CompBzip2 does not exist, creating\n");
 			if(mysql_query(&mysql, createcompbz2)) {
 				printf("Error: %s\n", mysql_error(&mysql));
 			}
-		}
+		}*/
 		//TODO add more tables
 
 		mysql_close(&mysql);

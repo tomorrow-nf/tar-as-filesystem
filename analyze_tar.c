@@ -12,34 +12,34 @@
 int analyze_tar(char* f_name) {
 
     FILE* tarfile;
-	int GB_read = 0;         		// number of gigabytes read so far
-	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
-	char* tar_filename = f_name; 	// file to analyze
-	char* real_filename;            // the filename without any directory info in front of it
-	char* fullpath;             // the absolute path to the file
-	long int longtmp; 				// temporary variable for calculations
-	long long int longlongtmp; 		// temporary variable for calculations
-	int dberror = 0;                  // indicate an error in analysis
+	int GB_read = 0;         	  // number of gigabytes read so far
+	long int bytes_read = 0;      // total bytes read - (gigabytes read * bytes per gigabyte)
+	char* tar_filename = f_name;  // file to analyze
+	char* real_filename;          // the filename without any directory info in front of it
+	char* fullpath;               // the absolute path to the file
+	long int longtmp; 			  // temporary variable for calculations
+	long long int longlongtmp; 	  // temporary variable for calculations
+	int dberror = 0;              // indicate an error in analysis
 
-	//create end of archive check
+	// End of archive check
 	char archive_end_check[1024];
 	char archive_end[1024];
 	memset(archive_end, 0, sizeof(archive_end));
 
 	char* tempsdf = (char*) malloc(90);
 
-	//Tar file important info
-	char* membername = (char*) malloc(MEMBERNAMESIZE);                 // name of member file
+	// Information for TAR archive and member headers
+	char* membername = (char*) malloc(MEMBERNAMESIZE);               // name of member file
 	char* file_length_string = (char*) malloc(FILELENGTHFIELDSIZE);  // size of file in bytes (octal string)
 	long long int file_length;                                       // size of file in bytes (long int)
 	void* trashbuffer = (void*) malloc(sizeof(char) * 200);          // for unused fields
 	char link_flag;                                                  // flag indicating this is a file link
-	char* linkname = (char*) malloc(MEMBERNAMESIZE);                  // name of linked file
+	char* linkname = (char*) malloc(MEMBERNAMESIZE);                 // name of linked file
 	char* ustarflag = (char*) malloc(USTARFIELDSIZE);                // field indicating newer ustar format
-	char* memberprefix = (char*) malloc(PREFIXSIZE);                  // ustar includes a field for long names
+	char* memberprefix = (char*) malloc(PREFIXSIZE);                 // ustar includes a field for long names
 
 	
-	// get real filename
+	// get local path to file
 	real_filename = strrchr(tar_filename, '/');
 	if (!real_filename) {
 		real_filename = tar_filename;

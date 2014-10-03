@@ -7,11 +7,59 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <bzlib.h>
 #include "common_functions.h"
+
+void* getblock(BZFILE* b, long int blocksize) {
+	
+	void* blockbuf = (char*) malloc(blocksize); // Build a buffer to hold a single block
+	int bzerror; // bz2 error checking
+
+    // Read a single block into the buffer
+    BZ2_bzRead(&bzerror, b, blockbuf, blocksize);
+
+    if (bzerror == BZ_OK){
+    	return blockbuf;
+    }
+    else {
+	    //check appropriate errors 
+	    switch (bzerror) {
+	    	case BZ_PARAM_ERROR:
+	    		printf("ERROR: bz2 parameter error\n");
+	    		return NULL;
+	    	case BZ_SEQUENCE_ERROR:
+	    		printf("ERROR: bz2 file was not opened read-only\n");
+	    		return NULL;
+	    	case BZ_IO_ERROR:
+	    		printf("ERROR: Error reading from compressed file\n");
+	    		return NULL;
+	    	case BZ_UNEXPECTED_EOF:
+	    		printf("ERROR: Unexpected end of file\n");
+	    		return NULL;
+	    	case BZ_DATA_ERROR:
+	    		printf("ERROR: Data integrity error in compressed archive\n");
+	    		return NULL;
+	    	case BZ_DATA_ERROR_MAGIC:
+	    		printf("ERROR: Data integrity error in compressed archive\n");
+	    		return NULL;
+	    	case BZ_MEM_ERROR:
+	    		printf("ERROR: Insufficient memory available\n");
+	    		return NULL;
+	    	case BZ_STREAM_END:
+	    		// TODO
+	    		return NULL;
+	    	default:
+	    		printf("ERROR: bz2 error\n");
+	    		return NULL;
+	    }
+    }
+}
 
 int analyze_bz2(char* f_name) {
 
-	FILE* tarfile;
+	FILE* tarfile;   // for checking header
+	BZFILE* bz2file; // for evaluating file. These are both the same archive
+
 	int GB_read = 0;         		// number of gigabytes read so far
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_filename = f_name; 	// file to analyze
@@ -21,22 +69,25 @@ int analyze_bz2(char* f_name) {
 	long long int longlongtmp; 		// temporary variable for calculations
 	int dberror = 0;                // indicate an error in analysis
 
-	//create end of archive check
+	// End of archive check
 	char archive_end_check[1024];
 	char archive_end[1024];
 	memset(archive_end, 0, sizeof(archive_end));
 
 	char* tempsdf = (char*) malloc(90);
 
-	//Tar file important info
-	char* membername = (char*) malloc(MEMBERNAMESIZE);                 // name of member file
+	// Information for BZ2 archive and member headers
+	char* membername = (char*) malloc(MEMBERNAMESIZE);               // name of member file
 	char* file_length_string = (char*) malloc(FILELENGTHFIELDSIZE);  // size of file in bytes (octal string)
 	long long int file_length;                                       // size of file in bytes (long int)
 	void* trashbuffer = (void*) malloc(sizeof(char) * 200);          // for unused fields
 	char link_flag;                                                  // flag indicating this is a file link
-	char* linkname = (char*) malloc(MEMBERNAMESIZE);                  // name of linked file
+	char* linkname = (char*) malloc(MEMBERNAMESIZE);                 // name of linked file
 	char* ustarflag = (char*) malloc(USTARFIELDSIZE);                // field indicating newer ustar format
-	char* memberprefix = (char*) malloc(PREFIXSIZE);                  // ustar includes a field for long names
+	char* memberprefix = (char*) malloc(PREFIXSIZE);                 // ustar includes a field for long names
+
+	long int blocksize; // bz2 blocksize (inteval of 100 from 100kB to 900kB)
+	int bzerror; // bz2 error checking
 
 	
 	// get real filename
@@ -49,262 +100,27 @@ int analyze_bz2(char* f_name) {
 	}
 	fullpath = realpath(tar_filename, NULL);
 
-	// connect to database, begin a transaction
-	MYSQL *con = mysql_init(NULL);
-	mysql_init(con);
-	if(!mysql_real_connect(con, "localhost", "root", "root", "Tarfiledb", 0, NULL, 0)) {
-		printf("Connection Failure: %s\n", mysql_error(con));
-		//exit, no point
-		mysql_close(con);
-		free(tempsdf);
-		free(membername);
-		free(file_length_string);
-		free(trashbuffer);
-		free(linkname);
-		free(ustarflag);
-		free(memberprefix);
-		free(fullpath);
-		return 1;
-	}
-
-
+	// Open the archive for evaluation
 	tarfile = fopen(tar_filename, "r");
 	if(!tarfile) {
 		printf("Unable to open file: %s\n", tar_filename);
 	}
 	else {
-			// begin transaction and check if this archive exists
-			char insQuery[1000]; // insertion query buffer (we dont want current timestamp, we want the file's last modified timestamp)
-			if(mysql_query(con, "START TRANSACTION")) {
-				printf("Start Transaction error:\n%s\n", mysql_error(con));
-				fclose(tarfile);
-				mysql_close(con);
-				free(tempsdf);
-				free(membername);
-				free(file_length_string);
-				free(trashbuffer);
-				free(linkname);
-				free(ustarflag);
-				free(memberprefix);
-				free(fullpath);
-				return 1;
-			}
+		// Evaluate the bz2 header. All we care about is the blocksize (4th byte)
+		fseek(tarfile, 3, SEEK_CUR);
+		char* blockbuffer = (char*) malloc(8); // single byte buffer
+		fread(blockbuffer, 1, 1, tarfile);
+		blocksize = atoi(blockbuffer) * 102400; // The value in the header is 1...9. We need that in bytes (* 100 * 1024)
+		printf("BZ2 Block size: %ld bytes\n", blocksize);
 
-			//check if file already exists and ask for permission to overwrite and remove references
-			sprintf(insQuery, "SELECT * from ArchiveList WHERE ArchiveName = '%s'", real_filename);
-			mysql_query(con, insQuery);
-			MYSQL_RES* result = mysql_store_result(con);
-			if(mysql_num_rows(result) == 0) {
-				printf("File does not exist");
-				//file foes not exist, do nothing
-				mysql_free_result(result);
-			}
-			else {
-				MYSQL_ROW row = mysql_fetch_row(result);
-				mysql_free_result(result);
-				char* yes_no = (char*) malloc(sizeof(char) * 20);
-				sprintf(yes_no, "bad"); //prime with bad answer
-				while(strcmp(yes_no, "y") && strcmp(yes_no, "Y") && strcmp(yes_no, "n") && strcmp(yes_no, "N")) {
-					printf("File analysis already exists, overwrite[Y/N]: ");
-					scanf("%s", yes_no);
-				}
-				// if N exit, if Y overwrite
-				if(!strcmp(yes_no, "N") || !strcmp(yes_no, "n")) {
-					if(mysql_query(con, "ROLLBACK")) {
-						printf("Rollback error:\n%s\n", mysql_error(con));
-					}
-					fclose(tarfile);
-					mysql_close(con);
-					free(tempsdf);
-					free(membername);
-					free(file_length_string);
-					free(trashbuffer);
-					free(linkname);
-					free(ustarflag);
-					free(memberprefix);
-					free(fullpath);
-					return 1;
-				}
-				else {
-					sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
-					if(mysql_query(con, insQuery)) {
-						printf("Delete error:\n%s\n", mysql_error(con));
-						dberror = 1;
-					}
-					sprintf(insQuery, "DELETE FROM UncompTar WHERE ArchiveName = '%s'", real_filename);
-					if(mysql_query(con, insQuery)) {
-						printf("Delete error:\n%s\n", mysql_error(con));
-						dberror = 1;
-					}
-				}
-			}
-			
-			// file is not in database or it has been cleared from database
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', '%s', 'timestamp')", real_filename, fullpath);
-			if(mysql_query(con, insQuery)) {
-				printf("Insert error:\n%s\n", mysql_error(con));
-				dberror = 1;
-			}		
+		// Open the file as a bz2 file so that it can be decompressed
+		bz2file = BZ2_bzopen(tar_filename, "r");
 
-			while(1) {
-				// Evaluate the tar header
-				printf("member header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
-
-				//get filename
-				fread((void*)membername, MEMBERNAMESIZE, 1, tarfile);
-				printf("member name: %s\n", membername);
-				bytes_read = bytes_read + MEMBERNAMESIZE;
-
-				//discard mode, uid, and gid (8 bytes each)
-				fread((void*)trashbuffer, (sizeof(char) * 24), 1, tarfile);
-				bytes_read = bytes_read + (sizeof(char) * 24);
-
-				//get length of file in bytes
-				fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
-				printf("file length (string): %s\n", file_length_string);
-				file_length = strtoll(file_length_string, NULL, 8);
-				printf("file length (int): %lld\n", file_length);
-				bytes_read = bytes_read + FILELENGTHFIELDSIZE;
-
-				//discard modify time and checksum (20 bytes)
-				fread((void*)trashbuffer, (sizeof(char) * 20), 1, tarfile);
-				bytes_read = bytes_read + (sizeof(char) * 20);
-
-				//get link flag (1 byte)
-				fread((void*)(&link_flag), sizeof(char), 1, tarfile);
-				printf("link flag: %c\n", link_flag);
-				bytes_read = bytes_read + sizeof(char);
-
-				//get linked filename (if flag set, otherwise this field is useless)
-				fread((void*)linkname, MEMBERNAMESIZE, 1, tarfile);
-				printf("link name: %s\n", linkname);
-				bytes_read = bytes_read + MEMBERNAMESIZE;
-
-				//get ustar flag and version, ignore version in check
-				fread((void*)ustarflag, USTARFIELDSIZE, 1, tarfile);
-				printf("ustar flag: %s\n", ustarflag);
-				bytes_read = bytes_read + USTARFIELDSIZE;
-
-				// if flag is ustar get rest of fields, else we went into data, go back
-				if(strncmp(ustarflag, "ustar", 5) == 0) {
-					//discard ustar data (80 bytes)
-					fread((void*)trashbuffer, (sizeof(char) * 80), 1, tarfile);
-					bytes_read = bytes_read + (sizeof(char) * 80);
-
-					//get ustar file prefix (may be nothing but /0)
-					fread((void*)memberprefix, PREFIXSIZE, 1, tarfile);
-					printf("file prefix: %s\n", memberprefix);
-					bytes_read = bytes_read + PREFIXSIZE;
-				}
-				else {
-					fseek(tarfile, (-8), SEEK_CUR); //go back 8 bytes
-					bytes_read = bytes_read - 8;
-				}
-
-				// Analyze the archive contents
-				//skip rest of 512 byte block
-				longtmp = 512 - (bytes_read % 512); //get bytes left till end of block
-				if(longtmp != 0) {
-					fseek(tarfile, longtmp, SEEK_CUR);
-					bytes_read = bytes_read + longtmp;
-				}
-
-				//reduce bytes read to below a gigabyte
-				if(bytes_read >= BYTES_IN_GB) {
-					bytes_read = bytes_read - BYTES_IN_GB;
-					GB_read = GB_read + 1;
-				}
-
-				//print beginning point of data
-				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
-
-				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
-				if(mysql_query(con, insQuery)) {
-					printf("Insert error:\n%s\n", mysql_error(con));
-					printf("%s\n", insQuery);
-					dberror = 1;
-				}
-
-				//skip data
-				//SEEK_CUR = current position macro, already defined
-				if(file_length >= BYTES_IN_GB) {
-					longlongtmp = file_length;
-					while(longlongtmp >= BYTES_IN_GB) {
-						fseek(tarfile, BYTES_IN_GB, SEEK_CUR);
-						GB_read = GB_read + 1;
-						longlongtmp = longlongtmp - BYTES_IN_GB;
-					}
-					if(longlongtmp > 0) {
-						if((longlongtmp % 512) != 0) {
-							longtmp = longlongtmp + (512 - (longlongtmp % 512));
-						}
-						else {
-							longtmp = longlongtmp;
-						}
-						fseek(tarfile, longtmp, SEEK_CUR);
-						bytes_read = bytes_read + longtmp;
-					}
-				}
-				else if(file_length == 0) {
-					// do not skip any data
-				}
-				else {
-					if((file_length % 512) != 0) {
-						longtmp = file_length + (512 - (file_length % 512));
-					}
-					else {
-						longtmp = file_length;
-					}
-					fseek(tarfile, longtmp, SEEK_CUR);
-					bytes_read = bytes_read + longtmp;
-				}
-
-				//end printed info with newline
-				printf("\n");
-
-				//check for end of archive
-				fread((void*)archive_end_check, sizeof(archive_end_check), 1, tarfile);
-				if(memcmp(archive_end_check, archive_end, sizeof(archive_end)) == 0) {
-					break; //1024 bytes of zeros mark end of archive
-				}
-				else {
-					fseek(tarfile, (-1 * sizeof(archive_end_check)), SEEK_CUR); //move back 1024 bytes
-				}
-				//scanf("%s", tempsdf);
-			}
-			//the file has been read, commit the transation and close the connection
-			if(dberror == 1) {
-				if(mysql_query(con, "ROLLBACK")) {
-					printf("Rollback error:\n%s\n", mysql_error(con));
-				}
-				else {
-					printf("Entries rolled back\n");
-				}
-			}
-			else {
-				if(mysql_query(con, "COMMIT")) {
-					printf("Commit error:\n%s\n", mysql_error(con));
-				}
-				else {
-					printf("Entries committed\n");
-				}
-			}
-			fclose(tarfile);
+		while (1){
+			// Get a block
+			getblock(bz2file, blocksize);
 		}
-
-	//close database connection
-		mysql_close(con);
-
-	//free memory
-		free(tempsdf);
-		free(membername);
-		free(file_length_string);
-		free(trashbuffer);
-		free(linkname);
-		free(ustarflag);
-		free(memberprefix);
-		free(fullpath);
 
 		return 0;
 	}
+}

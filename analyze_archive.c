@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 	if(strcmp(file_handle, "tar") == 0) {
 		problem_variable = analyze_tar(filename);
 	}
-	else if(strcmp(file_handle, "bz") == 0) {
+	else if(strcmp(file_handle, "bz2") == 0) {
 		problem_variable = analyze_bz2(filename);
 	}
 	/*
