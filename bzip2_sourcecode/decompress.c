@@ -4,6 +4,7 @@
 /*---                                          decompress.c ---*/
 /*-------------------------------------------------------------*/
 long long int kpdavidson_bits = 0;
+int kpdavidson_blockno = 0;
 /* ------------------------------------------------------------------
    This file is part of bzip2/libbzip2, a program and library for
    lossless, block-sorting data compression.
@@ -41,6 +42,7 @@ void makeMaps_d ( DState* s )
    { retVal = rrr; goto save_state_and_return; };
 
 #define GET_BITS(lll,vvv,nnn)                     \
+   kpdavidson_bits = kpdavidson_bits + nnn;       \
    case lll: s->state = lll;                      \
    while (True) {                                 \
       if (s->bsLive >= nnn) {                     \
@@ -219,7 +221,9 @@ Int32 BZ2_decompress ( DState* s )
          if (s->tt == NULL) RETURN(BZ_MEM_ERROR);
       }
 
-      printf("current bit offset block beginning: %lld\n", kpdavidson_bits);
+      kpdavidson_blockno++;
+      printf("current bit offset block %d beginning: %lld\n", kpdavidson_blockno, kpdavidson_bits);
+
       GET_UCHAR(BZ_X_BLKHDR_1, uc);
 
       if (uc == 0x17) goto endhdr_2;

@@ -15,44 +15,41 @@ void* getblock(BZFILE* b, long int blocksize) {
 	void* blockbuf = (char*) malloc(blocksize); // Build a buffer to hold a single block
 	int bzerror; // bz2 error checking
 
-    // Read a single block into the buffer
-    BZ2_bzRead(&bzerror, b, blockbuf, blocksize);
+	// Read a single block into the buffer
+	BZ2_bzRead(&bzerror, b, blockbuf, blocksize);
 
-    if (bzerror == BZ_OK){
-    	return blockbuf;
-    }
-    else {
-	    //check appropriate errors 
-	    switch (bzerror) {
-	    	case BZ_PARAM_ERROR:
-	    		printf("ERROR: bz2 parameter error\n");
-	    		return NULL;
-	    	case BZ_SEQUENCE_ERROR:
-	    		printf("ERROR: bz2 file was not opened read-only\n");
-	    		return NULL;
-	    	case BZ_IO_ERROR:
-	    		printf("ERROR: Error reading from compressed file\n");
-	    		return NULL;
-	    	case BZ_UNEXPECTED_EOF:
-	    		printf("ERROR: Unexpected end of file\n");
-	    		return NULL;
-	    	case BZ_DATA_ERROR:
-	    		printf("ERROR: Data integrity error in compressed archive\n");
-	    		return NULL;
-	    	case BZ_DATA_ERROR_MAGIC:
-	    		printf("ERROR: Data integrity error in compressed archive\n");
-	    		return NULL;
-	    	case BZ_MEM_ERROR:
-	    		printf("ERROR: Insufficient memory available\n");
-	    		return NULL;
-	    	case BZ_STREAM_END:
-	    		// TODO
-	    		return NULL;
-	    	default:
-	    		printf("ERROR: bz2 error\n");
-	    		return NULL;
-	    }
-    }
+	if (bzerror == BZ_OK || bzerror == BZ_STREAM_END){
+		return blockbuf;
+	}
+	else {
+		//check appropriate errors 
+		switch (bzerror) {
+			case BZ_PARAM_ERROR:
+				printf("ERROR: bz2 parameter error\n");
+				return NULL;
+			case BZ_SEQUENCE_ERROR:
+				printf("ERROR: bz2 file was not opened read-only\n");
+				return NULL;
+			case BZ_IO_ERROR:
+				printf("ERROR: Error reading from compressed file\n");
+				return NULL;
+			case BZ_UNEXPECTED_EOF:
+				printf("ERROR: Unexpected end of file\n");
+				return NULL;
+			case BZ_DATA_ERROR:
+				printf("ERROR: Data integrity error in compressed archive\n");
+				return NULL;
+			case BZ_DATA_ERROR_MAGIC:
+				printf("ERROR: Data integrity error in compressed archive\n");
+				return NULL;
+			case BZ_MEM_ERROR:
+				printf("ERROR: Insufficient memory available\n");
+				return NULL;
+			default:
+				printf("ERROR: bz2 error\n");
+				return NULL;
+		}
+	}
 }
 
 int analyze_bz2(char* f_name) {
