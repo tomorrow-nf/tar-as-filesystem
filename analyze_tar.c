@@ -26,17 +26,15 @@ int analyze_tar(char* f_name) {
 	char archive_end[1024];
 	memset(archive_end, 0, sizeof(archive_end));
 
-	char* tempsdf = (char*) malloc(90);
-
 	// Information for TAR archive and member headers
-	char* membername = (char*) malloc(MEMBERNAMESIZE);               // name of member file
-	char* file_length_string = (char*) malloc(FILELENGTHFIELDSIZE);  // size of file in bytes (octal string)
-	long long int file_length;                                       // size of file in bytes (long int)
-	void* trashbuffer = (void*) malloc(sizeof(char) * 200);          // for unused fields
-	char link_flag;                                                  // flag indicating this is a file link
-	char* linkname = (char*) malloc(MEMBERNAMESIZE);                 // name of linked file
-	char* ustarflag = (char*) malloc(USTARFIELDSIZE);                // field indicating newer ustar format
-	char* memberprefix = (char*) malloc(PREFIXSIZE);                 // ustar includes a field for long names
+	char membername[MEMBERNAMESIZE];		// name of member file
+	char file_length_string[FILELENGTHFIELDSIZE];	// size of file in bytes (octal string)
+	long long int file_length;			// size of file in bytes (long int)
+	char trashbuffer[200];				// for unused fields
+	char link_flag;					// flag indicating this is a file link
+	char linkname[MEMBERNAMESIZE];			// name of linked file
+	char ustarflag[USTARFIELDSIZE];			// field indicating newer ustar format
+	char memberprefix[PREFIXSIZE];			// ustar includes a field for long names
 
 	
 	// get local path to file
@@ -56,37 +54,21 @@ int analyze_tar(char* f_name) {
 		printf("Connection Failure: %s\n", mysql_error(con));
 		//exit, no point
 		mysql_close(con);
-		free(tempsdf);
-		free(membername);
-		free(file_length_string);
-		free(trashbuffer);
-		free(linkname);
-		free(ustarflag);
-		free(memberprefix);
-		free(fullpath);
 		return 1;
 	}
 
 
-  tarfile = fopen(tar_filename, "r");
-  if(!tarfile) {
-   printf("Unable to open file: %s\n", tar_filename);
-}
-else {
+	tarfile = fopen(tar_filename, "r");
+	if(!tarfile) {
+		printf("Unable to open file: %s\n", tar_filename);
+	}
+	else {
 			// begin transaction and check if this archive exists
 			char insQuery[1000]; // insertion query buffer (we dont want current timestamp, we want the file's last modified timestamp)
 			if(mysql_query(con, "START TRANSACTION")) {
 				printf("Start Transaction error:\n%s\n", mysql_error(con));
 				fclose(tarfile);
 				mysql_close(con);
-				free(tempsdf);
-				free(membername);
-				free(file_length_string);
-				free(trashbuffer);
-				free(linkname);
-				free(ustarflag);
-				free(memberprefix);
-				free(fullpath);
 				return 1;
 			}
 
@@ -102,7 +84,7 @@ else {
 			else {
 				MYSQL_ROW row = mysql_fetch_row(result);
 				mysql_free_result(result);
-				char* yes_no = (char*) malloc(sizeof(char) * 20);
+				char yes_no[20];
 				sprintf(yes_no, "bad"); //prime with bad answer
 				while(strcmp(yes_no, "y") && strcmp(yes_no, "Y") && strcmp(yes_no, "n") && strcmp(yes_no, "N")) {
 					printf("File analysis already exists, overwrite[Y/N]: ");
@@ -115,14 +97,6 @@ else {
 					}
 					fclose(tarfile);
 					mysql_close(con);
-					free(tempsdf);
-					free(membername);
-					free(file_length_string);
-					free(trashbuffer);
-					free(linkname);
-					free(ustarflag);
-					free(memberprefix);
-					free(fullpath);
 					return 1;
 				}
 				else {
@@ -271,7 +245,6 @@ else {
 				else {
 					fseek(tarfile, (-1 * sizeof(archive_end_check)), SEEK_CUR); //move back 1024 bytes
 				}
-				//scanf("%s", tempsdf);
 			}
 			//the file has been read, commit the transation and close the connection
 			if(dberror == 1) {
@@ -295,16 +268,6 @@ else {
 
 	//close database connection
      mysql_close(con);
-
-	//free memory
-     free(tempsdf);
-     free(membername);
-     free(file_length_string);
-     free(trashbuffer);
-     free(linkname);
-     free(ustarflag);
-     free(memberprefix);
-     free(fullpath);
 
      return 0;
  }
