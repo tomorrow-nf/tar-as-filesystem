@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 			"Archive must have an appropriate file extension\n"
 			"----------------------------------\n"
 			"- Uncompressed TAR   archive: .tar\n"
-			"- Compressed   Bzip2 archive: .tar.bz2\n"
+			"- Compressed   Bzip2 archive: .tar.bz2, .tbz, .tbz2\n"
 			"- Compressed   Gzip  archive: .tar.gz\n"
 			"- Compressed   XZ    archive: .tar.xz\n"
 			"----------------------------------\n", filename);

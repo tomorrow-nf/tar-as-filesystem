@@ -77,7 +77,7 @@ int analyze_tar(char* f_name) {
 			mysql_query(con, insQuery);
 			MYSQL_RES* result = mysql_store_result(con);
 			if(mysql_num_rows(result) == 0) {
-				printf("File does not exist");
+				printf("File does not exist\n");
 				//file foes not exist, do nothing
 				mysql_free_result(result);
 			}

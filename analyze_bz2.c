@@ -137,7 +137,7 @@ int analyze_bz2(char* f_name) {
 		mysql_query(con, insQuery);
 		MYSQL_RES* result = mysql_store_result(con);
 		if(mysql_num_rows(result) == 0) {
-			printf("File does not exist");
+			printf("File does not exist\n");
 			//file foes not exist, do nothing
 			mysql_free_result(result);
 		}
@@ -285,16 +285,24 @@ int analyze_bz2(char* f_name) {
 			long int tmp_blockposition = blockposition; //temp to hold original block position if data is in multiple blocks
 			numblocks = 1;
 
+			// read longtmp = block adjusted file length
+			if((file_length % 512) != 0) {
+				longtmp = file_length + (512 - (file_length % 512));
+			}
+			else {
+				longtmp = file_length;
+			}
+
 			printf("data begins in block %d, %ld bytes in\n", tmp_blocknumber, tmp_blockposition);
 			if(file_length == 0) {
 				// do nothing
 			}
-			else if(remainingdata >= file_length) {
-				remainingdata = remainingdata - file_length;
-				blockposition = blockposition + file_length;
+			else if(remainingdata >= longtmp) {
+				remainingdata = remainingdata - longtmp;
+				blockposition = blockposition + longtmp;
 			}
 			else {
-				long long int file_data_remaining = file_length;
+				long long int file_data_remaining = longtmp;
 				file_data_remaining = file_data_remaining - remainingdata;
 				free(memblock);
 				while(file_data_remaining >= blocksize) {
