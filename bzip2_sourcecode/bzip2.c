@@ -1,4 +1,6 @@
-
+/*
+	MODIFIED BY KYLE DAVIDSON AND TYLER MORROW
+*/
 /*-----------------------------------------------------------*/
 /*--- A block-sorting, lossless compressor        bzip2.c ---*/
 /*-----------------------------------------------------------*/
