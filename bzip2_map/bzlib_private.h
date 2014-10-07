@@ -1,3 +1,6 @@
+/*
+	Modified by Kyle Davidson and Tyler Morrow
+*/
 
 /*-------------------------------------------------------------*/
 /*--- Private header file for the library.                  ---*/
@@ -433,6 +436,12 @@ typedef
       Int32*   save_gLimit;
       Int32*   save_gBase;
       Int32*   save_gPerm;
+      //kpdavidson & tomorrow
+      long long int save_kpdavidson_bits;
+      long long int save_kpdavidson_bytes;
+      int save_kpdavidson_gb;
+      int save_kpdavidson_blockno;
+      //tomorrow & kpdavidson
 
    }
    DState;

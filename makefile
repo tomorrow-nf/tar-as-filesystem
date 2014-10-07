@@ -1,7 +1,11 @@
 all: analyze_archive extract_tar_member prepareDatabase
 
-analyze_archive: analyze_archive.o analyze_tar.o analyze_bz2.o common_functions.o
-	gcc -o build/analyze_archive build/analyze_archive.o build/analyze_tar.o build/analyze_bz2.o build/common_functions.o `mysql_config --libs` -lbz2
+analyze_archive: bzip2map analyze_archive.o analyze_tar.o analyze_bz2.o common_functions.o
+	gcc -o build/analyze_archive build/analyze_archive.o build/analyze_tar.o build/analyze_bz2.o build/common_functions.o `mysql_config --libs` -L. -lbz2
+
+bzip2map:
+	make map -C bzip2_map
+	mv bzip2_map/libbz2.a libbz2.a
 
 extract_tar_member: extract_tar_member.o common_functions.o
 	gcc -o build/extract_tar_member build/extract_tar_member.o build/common_functions.o `mysql_config --libs`
@@ -28,4 +32,5 @@ prepareDatabase.o: prepareDatabase.c
 	gcc -c `mysql_config --cflags` prepareDatabase.c -o build/prepareDatabase.o
 
 clean:
-	rm -f *.o  build/* temp/*
+	rm -f *.o  build/* temp/* libbz2.a
+	make clean -C bzip2_map

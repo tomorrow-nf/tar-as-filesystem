@@ -1,10 +1,11 @@
-
+/*
+	Modified by Kyle Davidson and Tyler Morrow
+*/
 /*-------------------------------------------------------------*/
 /*--- Decompression machinery                               ---*/
 /*---                                          decompress.c ---*/
 /*-------------------------------------------------------------*/
-long long int kpdavidson_bits = 0;
-int kpdavidson_blockno = 0;
+
 /* ------------------------------------------------------------------
    This file is part of bzip2/libbzip2, a program and library for
    lossless, block-sorting data compression.
@@ -137,6 +138,12 @@ Int32 BZ2_decompress ( DState* s )
    Int32* gLimit;
    Int32* gBase;
    Int32* gPerm;
+   //kpdavidson & tomorrow
+   long long int kpdavidson_bits = 0;
+   long long int kpdavidson_bytes = 0;
+   int kpdavidson_gb = 0;
+   int kpdavidson_blockno = 0;
+   //tomorrow & kpdavidson
 
    if (s->state == BZ_X_MAGIC_1) {
       /*initialise the save area*/
@@ -164,6 +171,12 @@ Int32 BZ2_decompress ( DState* s )
       s->save_gLimit      = NULL;
       s->save_gBase       = NULL;
       s->save_gPerm       = NULL;
+      //kpdavidson & tomorrow
+      s->save_kpdavidson_bits = 0;
+      s->save_kpdavidson_bytes = 0;
+      s->save_kpdavidson_gb = 0;
+      s->save_kpdavidson_blockno = 0;
+      //tomorrow & kpdavidson
    }
 
    /*restore from the save area*/
@@ -191,6 +204,12 @@ Int32 BZ2_decompress ( DState* s )
    gLimit      = s->save_gLimit;
    gBase       = s->save_gBase;
    gPerm       = s->save_gPerm;
+   //kpdavidson & tomorrow
+   kpdavidson_bits = s->save_kpdavidson_bits;
+   kpdavidson_bytes = s->save_kpdavidson_bytes;
+   kpdavidson_gb = s->save_kpdavidson_gb;
+   kpdavidson_blockno = s->save_kpdavidson_blockno;
+   //tomorrow & kpdavidson
 
    retVal = BZ_OK;
 
@@ -221,8 +240,10 @@ Int32 BZ2_decompress ( DState* s )
          if (s->tt == NULL) RETURN(BZ_MEM_ERROR);
       }
 
+      //kpdavidson & tomorrow
       kpdavidson_blockno++;
-      printf("current bit offset block %d beginning: %lld\n", kpdavidson_blockno, kpdavidson_bits);
+      printf("\n\nUSING MY DECOMPRESS\n\n");
+      //tomorrow & kpdavidson
 
       GET_UCHAR(BZ_X_BLKHDR_1, uc);
 
@@ -641,6 +662,12 @@ Int32 BZ2_decompress ( DState* s )
    s->save_gLimit      = gLimit;
    s->save_gBase       = gBase;
    s->save_gPerm       = gPerm;
+   //kpdavidson & tomorrow
+   s->save_kpdavidson_bits = kpdavidson_bits;
+   s->save_kpdavidson_bytes = kpdavidson_bytes;
+   s->save_kpdavidson_gb = kpdavidson_gb;
+   s->save_kpdavidson_blockno = kpdavidson_blockno;
+   //tomorrow & kpdavidson
 
    return retVal;   
 }

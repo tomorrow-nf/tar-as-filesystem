@@ -7,7 +7,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <bzlib.h>
+#include "bzip2_map/bzlib.h"
 #include "common_functions.h"
 
 void* getblock(BZFILE* b, long int blocksize) {
@@ -87,6 +87,8 @@ int analyze_bz2(char* f_name) {
 	int bzerror; // bz2 error checking
 	int blocknumber = 0; // block number being read
 	int numblocks = 1; // number of blocks data exists in
+	int datafromarchivecheck = 0; //if archivecheck had to backtrack
+	long int tmp_dataread;
 
 	
 	// get real filename
@@ -201,36 +203,46 @@ int analyze_bz2(char* f_name) {
 		}
 		long int remainingdata = blocksize;
 		long int blockposition = 0;
+		int firstrun = 1;
 
 		while (1){
 			// TAR HEADER SECTION - get tar header
 			char tmp_header_buffer[512];
-			if(remainingdata >= 512){
-				memcpy((void*) tmp_header_buffer, (memblock + blockposition), (sizeof(char) * 512));
-				remainingdata = remainingdata - 512;
-				blockposition = blockposition + 512;
+			
+			if(firstrun) {
+				if(remainingdata >= 512){
+					memcpy((void*) tmp_header_buffer, (memblock + blockposition), (sizeof(char) * 512));
+					remainingdata = remainingdata - 512;
+					blockposition = blockposition + 512;
+				}
+				else {
+					tmp_dataread = remainingdata;
+					memcpy((void*) tmp_header_buffer, (memblock + blockposition), (sizeof(char) * remainingdata));
+					free(memblock);
+
+					memblock = (char*) getblock(bz2file, blocksize);
+					blocknumber++;
+					if(memblock == NULL) {
+						BZ2_bzReadClose(&bzerror, bz2file);
+						fclose(tarfile);
+						mysql_close(con);
+						return 1;
+					}
+					remainingdata = blocksize;
+					blockposition = 0;
+
+					memcpy((void*)(tmp_header_buffer + tmp_dataread), (memblock + blockposition), (sizeof(char) * (512 - tmp_dataread)));
+					remainingdata = remainingdata - (512 - tmp_dataread);
+					blockposition = blockposition + (512 - tmp_dataread);
+				}
 			}
 			else {
-				long int tmp_dataread = remainingdata;
-				memcpy((void*) tmp_header_buffer, (memblock + blockposition), (sizeof(char) * remainingdata));
-				free(memblock);
-
-				memblock = (char*) getblock(bz2file, blocksize);
-				blocknumber++;
-				if(memblock == NULL) {
-					BZ2_bzReadClose(&bzerror, bz2file);
-					fclose(tarfile);
-					mysql_close(con);
-					return 1;
-				}
-				remainingdata = blocksize;
-				blockposition = 0;
-
-				memcpy((void*)(tmp_header_buffer + tmp_dataread), (memblock + blockposition), (sizeof(char) * (512 - tmp_dataread)));
-				remainingdata = remainingdata - (512 - tmp_dataread);
-				blockposition = blockposition + (512 - tmp_dataread);
+				//we are guarenteed to have the first 512 bytes of archive_end_check contain header data
+				memcpy((void*) tmp_header_buffer, archive_end_check, (sizeof(char) * 512));
 			}
-			
+
+			firstrun = 0;
+
 			// TAR HEADER SECTION - extract data from tmp_header_buffer
 			int tmp_header_buffer_position = 0;
 			//get filename
@@ -333,7 +345,7 @@ int analyze_bz2(char* f_name) {
 			// TEST ARCHIVE END SECTION - test for the end of the archive
 			//	-reminder: 	remainingdata: how much data is left in the block
 			//			blockposition: essentially our position in the block
-			int tmp_dataread = 0;
+			tmp_dataread = 0;
 			if(remainingdata >= 1024){
 				memcpy((void*) archive_end_check, (memblock + blockposition), (sizeof(char) * 1024));
 				remainingdata = remainingdata - 1024;
@@ -364,10 +376,15 @@ int analyze_bz2(char* f_name) {
 				break; //1024 bytes of zeros mark end of archive
 			}
 			else {
-				remainingdata = remainingdata + (1024 - tmp_dataread);
-				blockposition = blockposition - (1024 - tmp_dataread); //move back 1024 bytes
+				remainingdata = remainingdata + (512); //move back 512 bytes
+				blockposition = blockposition - (512); // tar header is now in archive_end_check
 			}
+			
 		}
+
+		free(memblock);
+		BZ2_bzReadClose(&bzerror, bz2file);
+		fclose(tarfile);
 
 		//the file has been read, commit the transation and close the connection
 		if(dberror == 1) {
@@ -387,9 +404,6 @@ int analyze_bz2(char* f_name) {
 			}
 		}
 
-		free(memblock);
-		BZ2_bzReadClose(&bzerror, bz2file);
-		fclose(tarfile);
 	}
 
 	mysql_close(con);
