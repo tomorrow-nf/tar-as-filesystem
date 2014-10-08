@@ -120,7 +120,8 @@ BZ_EXTERN int BZ_API(BZ2_bzDecompressInit) (
    );
 
 BZ_EXTERN int BZ_API(BZ2_bzDecompress) ( 
-      bz_stream* strm 
+      bz_stream* strm,
+      char* filename 
    );
 
 BZ_EXTERN int BZ_API(BZ2_bzDecompressEnd) ( 
@@ -161,7 +162,8 @@ BZ_EXTERN int BZ_API(BZ2_bzRead) (
       int*    bzerror, 
       BZFILE* b, 
       void*   buf, 
-      int     len 
+      int     len, 
+      char*   filename
    );
 
 BZ_EXTERN BZFILE* BZ_API(BZ2_bzWriteOpen) ( 
@@ -248,7 +250,8 @@ BZ_EXTERN BZFILE * BZ_API(BZ2_bzdopen) (
 BZ_EXTERN int BZ_API(BZ2_bzread) (
       BZFILE* b, 
       void* buf, 
-      int len 
+      int len, 
+      char* filename
    );
 
 BZ_EXTERN int BZ_API(BZ2_bzwrite) (

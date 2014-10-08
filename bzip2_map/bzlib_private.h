@@ -494,7 +494,7 @@ extern Int32
 BZ2_indexIntoF ( Int32, Int32* );
 
 extern Int32 
-BZ2_decompress ( DState* );
+BZ2_decompress ( DState*, Char* );
 
 extern void 
 BZ2_hbCreateDecodeTables ( Int32*, Int32*, Int32*, UChar*,

@@ -10,13 +10,13 @@
 #include "bzip2_map/bzlib.h"
 #include "common_functions.h"
 
-void* getblock(BZFILE* b, long int blocksize) {
+void* getblock(BZFILE* b, long int blocksize, char* fname) {
 	
 	void* blockbuf = (char*) malloc(blocksize); // Build a buffer to hold a single block
 	int bzerror; // bz2 error checking
 
 	// Read a single block into the buffer
-	BZ2_bzRead(&bzerror, b, blockbuf, blocksize);
+	BZ2_bzRead(&bzerror, b, blockbuf, blocksize, fname);
 
 	if (bzerror == BZ_OK || bzerror == BZ_STREAM_END){
 		return blockbuf;
@@ -193,7 +193,7 @@ int analyze_bz2(char* f_name) {
 		}
 
 		// Get a block as a char pointer for easy byte incrementing
-		char* memblock = (char*) getblock(bz2file, blocksize);
+		char* memblock = (char*) getblock(bz2file, blocksize, real_filename);
 		blocknumber++;
 		if(memblock == NULL) {
 			BZ2_bzReadClose(&bzerror, bz2file);
@@ -220,7 +220,7 @@ int analyze_bz2(char* f_name) {
 					memcpy((void*) tmp_header_buffer, (memblock + blockposition), (sizeof(char) * remainingdata));
 					free(memblock);
 
-					memblock = (char*) getblock(bz2file, blocksize);
+					memblock = (char*) getblock(bz2file, blocksize, real_filename);
 					blocknumber++;
 					if(memblock == NULL) {
 						BZ2_bzReadClose(&bzerror, bz2file);
@@ -318,7 +318,7 @@ int analyze_bz2(char* f_name) {
 				file_data_remaining = file_data_remaining - remainingdata;
 				free(memblock);
 				while(file_data_remaining >= blocksize) {
-					memblock = (char*) getblock(bz2file, blocksize);
+					memblock = (char*) getblock(bz2file, blocksize, real_filename);
 					numblocks++;
 					blocknumber++;
 					file_data_remaining = file_data_remaining - blocksize;
@@ -326,7 +326,7 @@ int analyze_bz2(char* f_name) {
 				}
 
 				if(file_data_remaining != 0) {
-					memblock = (char*) getblock(bz2file, blocksize);
+					memblock = (char*) getblock(bz2file, blocksize, real_filename);
 					remainingdata = blocksize - file_data_remaining;
 					blockposition = file_data_remaining;
 				}
@@ -356,7 +356,7 @@ int analyze_bz2(char* f_name) {
 				memcpy((void*) archive_end_check, (memblock + blockposition), (sizeof(char) * remainingdata));
 				free(memblock);
 
-				memblock = (char*) getblock(bz2file, blocksize);
+				memblock = (char*) getblock(bz2file, blocksize, real_filename);
 				blocknumber++;
 				if(memblock == NULL) {
 					BZ2_bzReadClose(&bzerror, bz2file);

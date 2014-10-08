@@ -106,7 +106,7 @@ void makeMaps_d ( DState* s )
 
 
 /*---------------------------------------------------*/
-Int32 BZ2_decompress ( DState* s )
+Int32 BZ2_decompress ( DState* s, char* filename )
 {
    UChar      uc;
    Int32      retVal;
@@ -242,7 +242,7 @@ Int32 BZ2_decompress ( DState* s )
 
       //kpdavidson & tomorrow
       kpdavidson_blockno++;
-      printf("\n\nUSING MY DECOMPRESS\n\n");
+      printf("\n\nUSING MY DECOMPRESS on %s\n\n", filename);
       //tomorrow & kpdavidson
 
       GET_UCHAR(BZ_X_BLKHDR_1, uc);

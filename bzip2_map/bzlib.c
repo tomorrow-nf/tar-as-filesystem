@@ -805,7 +805,7 @@ Bool unRLE_obuf_to_output_SMALL ( DState* s )
 
 
 /*---------------------------------------------------*/
-int BZ_API(BZ2_bzDecompress) ( bz_stream *strm )
+int BZ_API(BZ2_bzDecompress) ( bz_stream *strm, Char *filename )
 {
    Bool    corrupt;
    DState* s;
@@ -839,7 +839,7 @@ int BZ_API(BZ2_bzDecompress) ( bz_stream *strm )
          }
       }
       if (s->state >= BZ_X_MAGIC_1) {
-         Int32 r = BZ2_decompress ( s );
+         Int32 r = BZ2_decompress ( s, filename );
          if (r == BZ_STREAM_END) {
             if (s->verbosity >= 3)
                VPrintf2 ( "\n    combined CRCs: stored = 0x%08x, computed = 0x%08x", 
@@ -1162,7 +1162,8 @@ int BZ_API(BZ2_bzRead)
            ( int*    bzerror, 
              BZFILE* b, 
              void*   buf, 
-             int     len )
+             int     len,
+             char*   filename )
 {
    Int32   n, ret;
    bzFile* bzf = (bzFile*)b;
@@ -1196,7 +1197,7 @@ int BZ_API(BZ2_bzRead)
          bzf->strm.next_in = bzf->buf;
       }
 
-      ret = BZ2_bzDecompress ( &(bzf->strm) );
+      ret = BZ2_bzDecompress ( &(bzf->strm), filename );
 
       if (ret != BZ_OK && ret != BZ_STREAM_END)
          { BZ_SETERR(ret); return 0; };
@@ -1324,7 +1325,7 @@ int BZ_API(BZ2_bzBuffToBuffDecompress)
    strm.avail_in = sourceLen;
    strm.avail_out = *destLen;
 
-   ret = BZ2_bzDecompress ( &strm );
+   ret = BZ2_bzDecompress ( &strm, "badname" );
    if (ret == BZ_OK) goto output_overflow_or_eof;
    if (ret != BZ_STREAM_END) goto errhandler;
 
@@ -1475,11 +1476,11 @@ BZFILE * BZ_API(BZ2_bzdopen)
 
 
 /*---------------------------------------------------*/
-int BZ_API(BZ2_bzread) (BZFILE* b, void* buf, int len )
+int BZ_API(BZ2_bzread) (BZFILE* b, void* buf, int len, char* filename )
 {
    int bzerr, nread;
    if (((bzFile*)b)->lastErr == BZ_STREAM_END) return 0;
-   nread = BZ2_bzRead(&bzerr,b,buf,len);
+   nread = BZ2_bzRead(&bzerr,b,buf,len,filename);
    if (bzerr == BZ_OK || bzerr == BZ_STREAM_END) {
       return nread;
    } else {
