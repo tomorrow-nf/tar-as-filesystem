@@ -166,12 +166,16 @@ int analyze_bz2(char* f_name) {
 					printf("Delete error:\n%s\n", mysql_error(con));
 					dberror = 1;
 				}
-				//TODO CHANGE TABLE NAME
-				//sprintf(insQuery, "DELETE FROM UncompTar WHERE ArchiveName = '%s'", real_filename);
-				//if(mysql_query(con, insQuery)) {
-				//	printf("Delete error:\n%s\n", mysql_error(con));
-				//	dberror = 1;
-				//}
+				sprintf(insQuery, "DELETE FROM Bzip2_files WHERE ArchiveName = '%s'", real_filename);
+				if(mysql_query(con, insQuery)) {
+					printf("Delete error:\n%s\n", mysql_error(con));
+					dberror = 1;
+				}
+				sprintf(insQuery, "DELETE FROM Bzip2_blocks WHERE ArchiveName = '%s'", real_filename);
+				if(mysql_query(con, insQuery)) {
+					printf("Delete error:\n%s\n", mysql_error(con));
+					dberror = 1;
+				}
 			}
 		}
 		
@@ -337,7 +341,13 @@ int analyze_bz2(char* f_name) {
 			}
 			printf("file exists in %d blocks\n", numblocks);
 
-			//TODO add to sql database
+			// Build the query and submit it
+			sprintf(insQuery, "INSERT INTO Bzip2_files VALUES ('%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, tmp_blocknumber, tmp_blockposition, file_length_string, link_flag);
+			if(mysql_query(con, insQuery)) {
+				printf("Insert error:\n%s\n", mysql_error(con));
+				printf("%s\n", insQuery);
+				dberror = 1;
+			}
 			
 			//end printed info with newline
 			printf("\n");
