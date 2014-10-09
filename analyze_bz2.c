@@ -8,15 +8,16 @@
 #include <limits.h>
 #include <stdlib.h>
 #include "bzip2_map/bzlib.h"
+#include "bzip2_map/bitmapstructs.h"
 #include "common_functions.h"
 
-void* getblock(BZFILE* b, long int blocksize, char* fname) {
+void* getblock(BZFILE* b, long int blocksize, struct blockmap* offsets) {
 	
 	void* blockbuf = (char*) malloc(blocksize); // Build a buffer to hold a single block
 	int bzerror; // bz2 error checking
 
 	// Read a single block into the buffer
-	BZ2_bzRead(&bzerror, b, blockbuf, blocksize, fname);
+	BZ2_bzRead(&bzerror, b, blockbuf, blocksize, offsets);
 
 	if (bzerror == BZ_OK || bzerror == BZ_STREAM_END){
 		return blockbuf;
@@ -90,6 +91,10 @@ int analyze_bz2(char* f_name) {
 	int datafromarchivecheck = 0; //if archivecheck had to backtrack
 	long int tmp_dataread;
 
+	struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
+	block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * 200);
+	block_offsets->maxsize = 200;
+
 	
 	// get real filename
 	real_filename = strrchr(tar_filename, '/');
@@ -108,6 +113,8 @@ int analyze_bz2(char* f_name) {
 		printf("Connection Failure: %s\n", mysql_error(con));
 		//exit, no point
 		mysql_close(con);
+		free(block_offsets->blocklocations);
+		free(block_offsets);
 		return 1;
 	}
 
@@ -131,6 +138,8 @@ int analyze_bz2(char* f_name) {
 		if(mysql_query(con, "START TRANSACTION")) {
 			printf("Start Transaction error:\n%s\n", mysql_error(con));
 			mysql_close(con);
+			free(block_offsets->blocklocations);
+			free(block_offsets);
 			return 1;
 		}
 
@@ -158,6 +167,8 @@ int analyze_bz2(char* f_name) {
 					printf("Rollback error:\n%s\n", mysql_error(con));
 				}
 				mysql_close(con);
+				free(block_offsets->blocklocations);
+				free(block_offsets);
 				return 1;
 			}
 			else {
@@ -193,16 +204,20 @@ int analyze_bz2(char* f_name) {
 			BZ2_bzReadClose(&bzerror, bz2file);
 			fclose(tarfile);
 			mysql_close(con);
+			free(block_offsets->blocklocations);
+			free(block_offsets);
 			return 1;
 		}
 
 		// Get a block as a char pointer for easy byte incrementing
-		char* memblock = (char*) getblock(bz2file, blocksize, real_filename);
+		char* memblock = (char*) getblock(bz2file, blocksize, block_offsets);
 		blocknumber++;
 		if(memblock == NULL) {
 			BZ2_bzReadClose(&bzerror, bz2file);
 			fclose(tarfile);
 			mysql_close(con);
+			free(block_offsets->blocklocations);
+			free(block_offsets);
 			return 1;
 		}
 		long int remainingdata = blocksize;
@@ -224,12 +239,14 @@ int analyze_bz2(char* f_name) {
 					memcpy((void*) tmp_header_buffer, (memblock + blockposition), (sizeof(char) * remainingdata));
 					free(memblock);
 
-					memblock = (char*) getblock(bz2file, blocksize, real_filename);
+					memblock = (char*) getblock(bz2file, blocksize, block_offsets);
 					blocknumber++;
 					if(memblock == NULL) {
 						BZ2_bzReadClose(&bzerror, bz2file);
 						fclose(tarfile);
 						mysql_close(con);
+						free(block_offsets->blocklocations);
+						free(block_offsets);
 						return 1;
 					}
 					remainingdata = blocksize;
@@ -322,7 +339,7 @@ int analyze_bz2(char* f_name) {
 				file_data_remaining = file_data_remaining - remainingdata;
 				free(memblock);
 				while(file_data_remaining >= blocksize) {
-					memblock = (char*) getblock(bz2file, blocksize, real_filename);
+					memblock = (char*) getblock(bz2file, blocksize, block_offsets);
 					numblocks++;
 					blocknumber++;
 					file_data_remaining = file_data_remaining - blocksize;
@@ -330,7 +347,7 @@ int analyze_bz2(char* f_name) {
 				}
 
 				if(file_data_remaining != 0) {
-					memblock = (char*) getblock(bz2file, blocksize, real_filename);
+					memblock = (char*) getblock(bz2file, blocksize, block_offsets);
 					remainingdata = blocksize - file_data_remaining;
 					blockposition = file_data_remaining;
 				}
@@ -348,6 +365,10 @@ int analyze_bz2(char* f_name) {
 				printf("%s\n", insQuery);
 				dberror = 1;
 			}
+			//TODO get data from block_offsets and insert into Bzip2_blocks
+			printf("gb offset of block number %d: %d\n", tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).GB);
+			printf("byte offset of block number %d: %lld\n", tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).bytes);
+			printf("bit offset of block number %d: %lld\n", tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).bits);
 			
 			//end printed info with newline
 			printf("\n");
@@ -366,12 +387,14 @@ int analyze_bz2(char* f_name) {
 				memcpy((void*) archive_end_check, (memblock + blockposition), (sizeof(char) * remainingdata));
 				free(memblock);
 
-				memblock = (char*) getblock(bz2file, blocksize, real_filename);
+				memblock = (char*) getblock(bz2file, blocksize, block_offsets);
 				blocknumber++;
 				if(memblock == NULL) {
 					BZ2_bzReadClose(&bzerror, bz2file);
 					fclose(tarfile);
 					mysql_close(con);
+					free(block_offsets->blocklocations);
+					free(block_offsets);
 					return 1;
 				}
 				remainingdata = blocksize;
@@ -417,5 +440,7 @@ int analyze_bz2(char* f_name) {
 	}
 
 	mysql_close(con);
+	free(block_offsets->blocklocations);
+	free(block_offsets);
 	return 0;
 }

@@ -22,6 +22,8 @@
 #ifndef _BZLIB_H
 #define _BZLIB_H
 
+#include "bitmapstructs.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -121,7 +123,7 @@ BZ_EXTERN int BZ_API(BZ2_bzDecompressInit) (
 
 BZ_EXTERN int BZ_API(BZ2_bzDecompress) ( 
       bz_stream* strm,
-      char* filename 
+      struct blockmap* offsets 
    );
 
 BZ_EXTERN int BZ_API(BZ2_bzDecompressEnd) ( 
@@ -163,7 +165,7 @@ BZ_EXTERN int BZ_API(BZ2_bzRead) (
       BZFILE* b, 
       void*   buf, 
       int     len, 
-      char*   filename
+      struct blockmap* offsets
    );
 
 BZ_EXTERN BZFILE* BZ_API(BZ2_bzWriteOpen) ( 
@@ -251,7 +253,7 @@ BZ_EXTERN int BZ_API(BZ2_bzread) (
       BZFILE* b, 
       void* buf, 
       int len, 
-      char* filename
+      struct blockmap* offsets
    );
 
 BZ_EXTERN int BZ_API(BZ2_bzwrite) (

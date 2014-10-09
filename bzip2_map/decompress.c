@@ -22,6 +22,7 @@
 
 
 #include "bzlib_private.h"
+#include "bitmapstructs.h"
 
 
 /*---------------------------------------------------*/
@@ -106,7 +107,7 @@ void makeMaps_d ( DState* s )
 
 
 /*---------------------------------------------------*/
-Int32 BZ2_decompress ( DState* s, char* filename )
+Int32 BZ2_decompress ( DState* s, struct blockmap* offsets )
 {
    UChar      uc;
    Int32      retVal;
@@ -139,10 +140,10 @@ Int32 BZ2_decompress ( DState* s, char* filename )
    Int32* gBase;
    Int32* gPerm;
    //kpdavidson & tomorrow
-   long long int kpdavidson_bits = 0;
-   long long int kpdavidson_bytes = 0;
-   int kpdavidson_gb = 0;
-   int kpdavidson_blockno = 0;
+   long long int kpdavidson_bits;
+   long long int kpdavidson_bytes;
+   int kpdavidson_gb;
+   int kpdavidson_blockno;
    //tomorrow & kpdavidson
 
    if (s->state == BZ_X_MAGIC_1) {
@@ -240,11 +241,6 @@ Int32 BZ2_decompress ( DState* s, char* filename )
          if (s->tt == NULL) RETURN(BZ_MEM_ERROR);
       }
 
-      //kpdavidson & tomorrow
-      kpdavidson_blockno++;
-      printf("\n\nUSING MY DECOMPRESS on %s\n\n", filename);
-      //tomorrow & kpdavidson
-
       GET_UCHAR(BZ_X_BLKHDR_1, uc);
 
       if (uc == 0x17) goto endhdr_2;
@@ -264,6 +260,21 @@ Int32 BZ2_decompress ( DState* s, char* filename )
       if (s->verbosity >= 2)
          VPrintf1 ( "\n    [%d: huff+mtf ", s->currBlockNo );
  
+      //kpdavidson & tomorrow
+      kpdavidson_blockno++;
+      printf("\n\nUSING MY DECOMPRESS on block number %d\n", kpdavidson_blockno);
+      printf("got structure with max size of %d\n\n", offsets->maxsize);
+
+      if((offsets->maxsize - 10) <= kpdavidson_blockno) {
+         offsets->maxsize = (offsets->maxsize * 2);
+         offsets->blocklocations = (struct blocklocation*) realloc(offsets->blocklocations, offsets->maxsize);
+      }
+
+      ((offsets->blocklocations)[kpdavidson_blockno]).GB = 1;
+      ((offsets->blocklocations)[kpdavidson_blockno]).bytes = 1;
+      ((offsets->blocklocations)[kpdavidson_blockno]).bits = 1;
+      //tomorrow & kpdavidson
+
       s->storedBlockCRC = 0;
       GET_UCHAR(BZ_X_BCRC_1, uc);
       s->storedBlockCRC = (s->storedBlockCRC << 8) | ((UInt32)uc);

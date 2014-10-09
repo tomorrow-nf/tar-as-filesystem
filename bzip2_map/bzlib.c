@@ -805,7 +805,7 @@ Bool unRLE_obuf_to_output_SMALL ( DState* s )
 
 
 /*---------------------------------------------------*/
-int BZ_API(BZ2_bzDecompress) ( bz_stream *strm, Char *filename )
+int BZ_API(BZ2_bzDecompress) ( bz_stream *strm, struct blockmap* offsets )
 {
    Bool    corrupt;
    DState* s;
@@ -839,7 +839,7 @@ int BZ_API(BZ2_bzDecompress) ( bz_stream *strm, Char *filename )
          }
       }
       if (s->state >= BZ_X_MAGIC_1) {
-         Int32 r = BZ2_decompress ( s, filename );
+         Int32 r = BZ2_decompress ( s, offsets );
          if (r == BZ_STREAM_END) {
             if (s->verbosity >= 3)
                VPrintf2 ( "\n    combined CRCs: stored = 0x%08x, computed = 0x%08x", 
@@ -1163,7 +1163,7 @@ int BZ_API(BZ2_bzRead)
              BZFILE* b, 
              void*   buf, 
              int     len,
-             char*   filename )
+             struct blockmap* offsets )
 {
    Int32   n, ret;
    bzFile* bzf = (bzFile*)b;
@@ -1197,7 +1197,7 @@ int BZ_API(BZ2_bzRead)
          bzf->strm.next_in = bzf->buf;
       }
 
-      ret = BZ2_bzDecompress ( &(bzf->strm), filename );
+      ret = BZ2_bzDecompress ( &(bzf->strm), offsets );
 
       if (ret != BZ_OK && ret != BZ_STREAM_END)
          { BZ_SETERR(ret); return 0; };
@@ -1325,7 +1325,7 @@ int BZ_API(BZ2_bzBuffToBuffDecompress)
    strm.avail_in = sourceLen;
    strm.avail_out = *destLen;
 
-   ret = BZ2_bzDecompress ( &strm, "badname" );
+   ret = BZ2_bzDecompress ( &strm, NULL );
    if (ret == BZ_OK) goto output_overflow_or_eof;
    if (ret != BZ_STREAM_END) goto errhandler;
 
@@ -1476,11 +1476,11 @@ BZFILE * BZ_API(BZ2_bzdopen)
 
 
 /*---------------------------------------------------*/
-int BZ_API(BZ2_bzread) (BZFILE* b, void* buf, int len, char* filename )
+int BZ_API(BZ2_bzread) (BZFILE* b, void* buf, int len, struct blockmap* offsets )
 {
    int bzerr, nread;
    if (((bzFile*)b)->lastErr == BZ_STREAM_END) return 0;
-   nread = BZ2_bzRead(&bzerr,b,buf,len,filename);
+   nread = BZ2_bzRead(&bzerr,b,buf,len,offsets);
    if (bzerr == BZ_OK || bzerr == BZ_STREAM_END) {
       return nread;
    } else {
