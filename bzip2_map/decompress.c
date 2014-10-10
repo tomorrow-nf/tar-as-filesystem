@@ -238,6 +238,7 @@ Int32 BZ2_decompress ( DState* s, struct blockmap* offsets )
          if (s->ll16 == NULL || s->ll4 == NULL) RETURN(BZ_MEM_ERROR);
       } else {
          s->tt  = BZALLOC( s->blockSize100k * 100000 * sizeof(Int32) );
+         printf("allocating buffer size of %u\n", (s->blockSize100k * 100000 * sizeof(Int32)));
          if (s->tt == NULL) RETURN(BZ_MEM_ERROR);
       }
 
@@ -263,7 +264,9 @@ Int32 BZ2_decompress ( DState* s, struct blockmap* offsets )
       //kpdavidson & tomorrow
       kpdavidson_blockno++;
       printf("\n\nUSING MY DECOMPRESS on block number %d\n", kpdavidson_blockno);
+      printf("s currBlockNo %d\n", s->currBlockNo);
       printf("got structure with max size of %d\n\n", offsets->maxsize);
+      printf("bits read so far %lld\n", kpdavidson_bits);
 
       if((offsets->maxsize - 10) <= kpdavidson_blockno) {
          offsets->maxsize = (offsets->maxsize * 2);
@@ -638,7 +641,7 @@ Int32 BZ2_decompress ( DState* s, struct blockmap* offsets )
       s->storedCombinedCRC = (s->storedCombinedCRC << 8) | ((UInt32)uc);
       GET_UCHAR(BZ_X_CCRC_4, uc);
       s->storedCombinedCRC = (s->storedCombinedCRC << 8) | ((UInt32)uc);
-
+      printf("bits read at end %lld\n", kpdavidson_bits);
       s->state = BZ_X_IDLE;
       RETURN(BZ_STREAM_END);
 
