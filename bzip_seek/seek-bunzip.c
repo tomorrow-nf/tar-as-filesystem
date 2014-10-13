@@ -1,3 +1,14 @@
+/*
+ This code is licensed under the LGPLv2:
+  LGPL (http://www.gnu.org/copyleft/lgpl.html
+ and owned/created by The Taylor Lab at Johns
+ Hopkins University.
+
+ Modifications have been made by Kyle Davidson
+ and Tyler Morrow for use in our MQP project at
+ Worcester Polytechnic Institute
+*/
+
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +18,8 @@
 #include "micro-bunzip.h"
 
 #define BUF_SIZE 8192
+#define BYTES_IN_GB 1073741824
+#define BITS_IN_BYTE 8
 
 /**
  * Seek the bunzip_data `bz` to a specific position in bits `pos` by lseeking
@@ -14,13 +27,20 @@
  * bits already consumed. This probably only makes sense for seeking to the
  * start of a compressed block.
  */
-unsigned int seek_bits( bunzip_data *bd, unsigned long pos )
+unsigned int seek_bits( bunzip_data *bd, int GB, int Bytes, int Bits )
 {
-    off_t n_byte = pos / 8;
-    char n_bit = pos % 8;
+    int tmp = GB;
+    char n_bit = (Bits + 8) % 8;
 
     // Seek the underlying file descriptor
-    if ( lseek( bd->in_fd, n_byte, SEEK_SET ) != n_byte )
+    while(tmp > 0) {
+       if ( lseek( bd->in_fd, BYTES_IN_GB, SEEK_CUR ) != BYTES_IN_GB )
+       {
+           return -1;
+       }
+       tmp--;
+    }
+    if ( lseek( bd->in_fd, Bytes, SEEK_CUR ) != Bytes )
     {
         return -1;
     }
@@ -32,12 +52,12 @@ unsigned int seek_bits( bunzip_data *bd, unsigned long pos )
     // // Update the bit position counter to match
     // bd->inPosBits = pos;
 
-    return pos;
+    return 1;
 }
 
-/* Open, seek to block at pos, and uncompress */
+/* Open, seek to block, and uncompress */
 
-int uncompressblock( int src_fd, unsigned long pos )
+int uncompressblock( int src_fd, int GB, int Bytes, int Bits )
 {
     bunzip_data *bd;
     int status;
@@ -46,7 +66,7 @@ int uncompressblock( int src_fd, unsigned long pos )
 
     if ( !( status = start_bunzip( &bd, src_fd, 0, 0 ) ) )
     {
-        seek_bits( bd, pos );
+        seek_bits( bd, GB, Bytes, Bits );
 
         /* Fill the decode buffer for the block */
         if ( ( status = get_next_block( bd ) ) )
@@ -84,12 +104,4 @@ seek_bunzip_finish:
     free( bd );
 
     return status;
-}
-
-int main( int argc, char *argv[] )
-{
-    unsigned long pos = atol( argv[1] );
-    int status = uncompressblock( 0, pos );
-    if ( status )
-        fprintf( stderr, "\n%s\n", bunzip_errors[-status] );
 }
