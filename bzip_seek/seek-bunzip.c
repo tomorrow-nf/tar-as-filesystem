@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "micro-bunzip.h"
 
@@ -27,20 +28,13 @@
  * bits already consumed. This probably only makes sense for seeking to the
  * start of a compressed block.
  */
-unsigned int seek_bits( bunzip_data *bd, int GB, int Bytes, int Bits )
+unsigned int seek_bits( bunzip_data *bd, unsigned long long pos )
 {
-    int tmp = GB;
-    char n_bit = (Bits + 8) % 8;
+    off_t n_byte = pos / 8;
+    char n_bit = pos % 8;
 
     // Seek the underlying file descriptor
-    while(tmp > 0) {
-       if ( lseek( bd->in_fd, BYTES_IN_GB, SEEK_CUR ) != BYTES_IN_GB )
-       {
-           return -1;
-       }
-       tmp--;
-    }
-    if ( lseek( bd->in_fd, Bytes, SEEK_CUR ) != Bytes )
+    if ( lseek( bd->in_fd, n_byte, SEEK_SET ) != n_byte )
     {
         return -1;
     }
@@ -55,18 +49,25 @@ unsigned int seek_bits( bunzip_data *bd, int GB, int Bytes, int Bits )
     return 1;
 }
 
-/* Open, seek to block, and uncompress */
+/* Open, seek to block, and uncompress into buffer */
 
-int uncompressblock( int src_fd, int GB, int Bytes, int Bits )
+int uncompressblock( char* filename, unsigned long long position, void* buf )
 {
     bunzip_data *bd;
     int status;
     int gotcount;
     char outbuf[BUF_SIZE];
+    unsigned long long int bytes_written = 0;
+
+    int src_fd = open(filename, O_RDONLY);
+    if(src_fd < 0) {
+        printf("Unable to open file: %s\n", filename);
+        return 1;
+    }
 
     if ( !( status = start_bunzip( &bd, src_fd, 0, 0 ) ) )
     {
-        seek_bits( bd, GB, Bytes, Bits );
+        seek_bits( bd, position );
 
         /* Fill the decode buffer for the block */
         if ( ( status = get_next_block( bd ) ) )
@@ -93,7 +94,8 @@ int uncompressblock( int src_fd, int GB, int Bytes, int Bits )
             }
             else
             {
-                write( 1, outbuf, gotcount );
+                memcpy( (void*)((char*)buf + bytes_written), outbuf, gotcount );
+                bytes_written = bytes_written + gotcount;
             }
         }
     }
@@ -102,6 +104,7 @@ seek_bunzip_finish:
 
     if ( bd->dbuf ) free( bd->dbuf );
     free( bd );
+    close(src_fd);
 
     return status;
 }

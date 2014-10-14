@@ -24,12 +24,8 @@ int main() {
 	int basetar_exists = 0;
 
 	char* bzip2_files = "Bzip2_files";
-	char* create_bzip2_files = "CREATE TABLE Bzip2_files (ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, Blockoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	char* create_bzip2_files = "CREATE TABLE Bzip2_files (ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
 	int bzip2_files_exists = 0;
-
-	char* bzip2_blocks = "Bzip2_blocks";
-	char* create_bzip2_blocks = "CREATE TABLE Bzip2_blocks (ArchiveName VARCHAR(255), Blocknumber INT, GBoffset INT, BYTEoffset INT, BIToffset INT, PRIMARY KEY (ArchiveName, Blocknumber)) ENGINE=InnoDB";
-	int bzip2_blocks_exists = 0;
 
 /*	
 	char* basetar = "CompGzip";
@@ -91,7 +87,6 @@ int main() {
 				if(strcmp(row[0], archivetable) == 0) archivetable_exists = 1;
 				if(strcmp(row[0], basetar) == 0) basetar_exists = 1;
 				if(strcmp(row[0], bzip2_files) == 0) bzip2_files_exists = 1;
-				if(strcmp(row[0], bzip2_blocks) == 0) bzip2_blocks_exists = 1;
 				//TODO add more tables
 			}
 			mysql_free_result(response);
@@ -116,12 +111,6 @@ int main() {
 		if(!bzip2_files_exists) {
 			printf("Bzip2_files does not exist, creating\n");
 			if(mysql_query(&mysql, create_bzip2_files)) {
-				printf("Error: %s\n", mysql_error(&mysql));
-			}
-		}
-		if(!bzip2_blocks_exists) {
-			printf("Bzip2_blocks does not exist, creating\n");
-			if(mysql_query(&mysql, create_bzip2_blocks)) {
 				printf("Error: %s\n", mysql_error(&mysql));
 			}
 		}

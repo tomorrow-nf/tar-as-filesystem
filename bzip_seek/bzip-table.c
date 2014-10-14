@@ -46,15 +46,12 @@ int map_bzip2(char* filename, struct blockmap* offsets)
 
     bunzip_data *bd;
     int status;
-    unsigned long long bits_read;
+    unsigned long long position;
     char * c;
     char buffer[BUF_SIZE];
     int gotcount;
     int totalcount;
     int kpdavidson_blockno = 0;
-    int kpdavidson_GB = 0;
-    int kpdavidson_Bytes = 0;
-    int kpdavidson_Bits = 0;
 
     /* Attempt to open the bzip2 file, if successfull this consumes the
      * entire header and moves us to the start of the first block.
@@ -67,13 +64,9 @@ int map_bzip2(char* filename, struct blockmap* offsets)
             kpdavidson_blockno++;
 
             /* Determine bits read in the last block */
-            // NOTE: bits_read and bd->position are only added to, never used so
-            // they should be safe to zero
-            bits_read = bd->position - bd->inbufCount + bd->inbufPos;
-            bits_read = bits_read * 8 - bd->inbufBitCount;
-
-            // reset position
-            bd->position = 0;
+            position = bd->position;
+            position = position - bd->inbufCount + bd->inbufPos;
+            position = position * 8 - bd->inbufBitCount;
 
             /* Read one block */
             status = get_next_block( bd );
@@ -109,16 +102,12 @@ int map_bzip2(char* filename, struct blockmap* offsets)
 
             if((offsets->maxsize - 10) <= kpdavidson_blockno) {
                offsets->maxsize = (offsets->maxsize * 2);
-               offsets->blocklocations = (struct blocklocation*) realloc(offsets->blocklocations, offsets->maxsize);
+               offsets->blocklocations = (struct blocklocation*) realloc(offsets->blocklocations, (offsets->maxsize * sizeof(struct blocklocation)));
             }
 
-            //syphon bits from Bits into Bytes then GB
-            kpdavidson_Bits = kpdavidson_Bits + bits_read;
-
-            ((offsets->blocklocations)[kpdavidson_blockno]).GB = 0;
-            ((offsets->blocklocations)[kpdavidson_blockno]).bytes = 0;
-            ((offsets->blocklocations)[kpdavidson_blockno]).bits = kpdavidson_Bits;
+            ((offsets->blocklocations)[kpdavidson_blockno]).position = position;
             ((offsets->blocklocations)[kpdavidson_blockno]).uncompressedSize = totalcount;
+            printf("Block %d at %llu Bits of size %d\n", kpdavidson_blockno, position, totalcount);
         }
     }
 
