@@ -107,7 +107,7 @@ int analyze_bz2(char* f_name) {
 	mysql_query(con, insQuery);
 	MYSQL_RES* result = mysql_store_result(con);
 	if(mysql_num_rows(result) == 0) {
-		printf("File does not exist\n");
+		printf("File is not in database\n");
 		//file foes not exist, do nothing
 		mysql_free_result(result);
 	}

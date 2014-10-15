@@ -6,7 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "common_functions.h"
+#include "bzip_seek/bitmapstructs.h"
 
 
 int main(int argc, char* argv[]) {
@@ -25,7 +30,6 @@ int main(int argc, char* argv[]) {
 
 	char* tar_filename = argv[1];   // file to extract member from
 	// Set file extension
-	// TODO: This is copied from analyze_tar, we can probably combine them later
 	char* tar_file_handle = strrchr(tar_filename, '.');
 	if (!tar_file_handle) {
 		printf("no file handle given\n");
@@ -42,19 +46,17 @@ int main(int argc, char* argv[]) {
 	sprintf(output, "%s%s", tempdirectory, membername);
 	
 	// Member info to be queried from the database
-	int gb_offset;
-	long int b_offset;
+	unsigned long long block_offset;
+	long int inside_offset;
 	long long int mem_length;
-	void* write_buf = (void*) malloc(BLOCKSIZE);
+	
 	char* fullpath; //full path location of archive
 
 	// Initial declarations for the tar archive and output file
-	FILE* tarfile;
-	FILE* member;
+	int tarfile;
+	int member;
 
 	// Temporary values
-	long long int longlongtmp;
-	long int longtmp;
 	char queryBuf[1000]; // query buffer
 	MYSQL_ROW row; //row to store query results
 
@@ -68,7 +70,6 @@ int main(int argc, char* argv[]) {
 	if(mysql_num_rows(result) == 0) {
 		printf("The archive file does not exist\n");
 		mysql_free_result(result);
-		free(write_buf);
 		free(output);
 		mysql_close(con);
 		return 1;
@@ -80,20 +81,17 @@ int main(int argc, char* argv[]) {
 		strcpy(fullpath, row[1]);
 	}
 	mysql_free_result(result);
-
-	// Uncompressed tar archive
-	if(strcmp(tar_file_handle, "tar") != 0) {
-		printf("The file handle was not tar\n");
-		free(write_buf);
+	// Bzip2 compressed tar archive
+	if(strcmp(tar_file_handle, "bz2") != 0) {
+		printf("The file handle is not bz2\n");
 		free(output);
 		mysql_close(con);
 		return 1;
 	}
 	else {
-		tarfile = fopen(fullpath, "r");
-		if(!tarfile) {
+		tarfile = open(fullpath, O_RDONLY);
+		if(tarfile < 0) {
 			printf("Unable to open file: %s\n", fullpath);
-			free(write_buf);
 			free(fullpath);
 			free(output);
 			mysql_close(con);
@@ -101,13 +99,12 @@ int main(int argc, char* argv[]) {
 		}
 		else {
 			// Query the offsets and member file length from the database
-			sprintf(queryBuf, "SELECT * from UncompTar WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
+			sprintf(queryBuf, "SELECT * from Bzip2_files WHERE ArchiveName = '%s' AND MemberName = '%s'", tar_filename, membername);
 			if(mysql_query(con, queryBuf)) {
 				printf("Select error:\n%s\n", mysql_error(con));
-				free(write_buf);
 				free(fullpath);
 				free(output);
-				fclose(tarfile);
+				close(tarfile);
 				mysql_close(con);
 				return 1;
 			}
@@ -115,72 +112,56 @@ int main(int argc, char* argv[]) {
 			if(mysql_num_rows(result) == 0) {
 				printf("The desired file does not exist\n");
 				mysql_free_result(result);
-				free(write_buf);
 				free(fullpath);
 				free(output);
-				fclose(tarfile);
+				close(tarfile);
 				mysql_close(con);
 				return 1;
 
 			}
 			row = mysql_fetch_row(result);
-			gb_offset = atoi(row[2]);
-			printf("GB offset: %d\n", gb_offset); //DEBUG
-			b_offset = strtol(row[3], NULL, 10);
-			printf("b_offset: %ld\n", b_offset); //DEBUG
-			mem_length = strtoll(row[4], NULL, 8);
+			
+			block_offset = strtoull(row[3], NULL, 10);
+			printf("block_offset: %llu\n", block_offset); //DEBUG
+			inside_offset = strtol(row[4], NULL, 10);
+			printf("inside_offset: %ld\n", inside_offset); //DEBUG
+			mem_length = strtoll(row[5], NULL, 8);
 			printf("mem_length string: %s\n", row[4]); //DEBUG
 			printf("mem_length: %lld\n", mem_length); //DEBUG
 			
 			mysql_free_result(result);
 
-			// Seek to the file's offset
-			if(gb_offset != 0) {
-				int i;
-				for(i=1; i<=gb_offset; i++) {
-					fseek(tarfile, BYTES_IN_GB, SEEK_CUR);
-				}
-			}
-			fseek(tarfile, b_offset, SEEK_CUR);
-
-			member = fopen(output, "w"); // Create a file to write to
-			if(!member) {
+			
+			member = creat(output, S_IRWXU); // Create a file to write to
+			if(member < 0) {
 				printf("Unable to create file: %s\n", output);
-				free(write_buf);
 				free(output);
 				free(fullpath);
 				mysql_close(con);
-				fclose(tarfile);
+				close(tarfile);
 				return 1;
 			}
-			else {
-				long long int bytes_read = 0;
-
-				// Copy the file by blocks
-				printf("Copying the file\n");
-				while (bytes_read < mem_length){
-					if((mem_length - bytes_read) < BLOCKSIZE) {
-						long int data_left = (mem_length - bytes_read);
-						fread(write_buf, data_left, 1, tarfile);
-						fwrite(write_buf, data_left, 1, member);
-						break;
-					}
-					else {
-						fread(write_buf, BLOCKSIZE, 1, tarfile);
-						fwrite(write_buf, BLOCKSIZE, 1, member);
-						bytes_read = bytes_read + BLOCKSIZE;
-					}
-				}
-				free(write_buf);
+			
+			printf("Both files open, uncompressing\n");
+			//pass the information & file handles to the function that decompresses, seeks, & writes
+			int uncomperror = uncompressfile( tarfile, member, block_offset, inside_offset, mem_length );
+			if(uncomperror) {
+				printf("There was an error in extracting the file\n");
 				free(output);
 				free(fullpath);
-				fclose(tarfile);
-				fclose(member);
 				mysql_close(con);
-				return 0;
+				close(tarfile);
+				close(member);
+				return 1;
 			}
+
+			//close files and finish
+			free(output);
+			free(fullpath);
+			mysql_close(con);
+			close(tarfile);
+			close(member);
+			return 0;
 		}
 	}
 }
-
-
