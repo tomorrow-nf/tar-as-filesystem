@@ -28,7 +28,7 @@ analyze_archive.o: analyze_archive.c common_functions.h
 	gcc -c analyze_archive.c -o build/analyze_archive.o
 
 analyze_xz.o: analyze_xz.c common_functions.h
-	gcc -c `mysql_config --cflags` analyze_xz.c -o build/analyze_xz.o
+	gcc -c `mysql_config --cflags` -liblzma analyze_xz.c -o build/analyze_xz.o
 
 analyze_bz2.o: analyze_bz2.c common_functions.h
 	gcc -c `mysql_config --cflags` analyze_bz2.c -o build/analyze_bz2.o

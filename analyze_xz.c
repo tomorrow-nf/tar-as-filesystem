@@ -7,13 +7,82 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <stddef.h>
+#include <inttypes.h>
+#include <lzma.h>
+#include "bzip_seek/bitmapstructs.h" //this is just for the block struct
 #include "common_functions.h"
 
-void* getblock_xz() {
-	// Read a single block into the buffer
+// Various structs for handling XZ streams and blocks
+// Some are not built here as they are included in the XZ
+// source code
+struct xz_stream {
+	int flags;
+	int stored_backward_size;
+	int real_backward_size;
+	struct blockmap blocks;
+};
 
-	return NULL;
+struct xz_recordss {
+	size_t unpad_size;
+	size_t uncomp_size;
+};
+
+// Multibyte int handling, from
+// http://tukaani.org/xz/xz-file-format.txt
+size_t encode(uint8_t buf[static 9], uint64_t num){
+	if (num > UINT64_MAX / 2)
+		return 0;
+
+	size_t i = 0;
+
+	while (num >= 0x80) {
+		buf[i++] = (uint8_t)(num) | 0x80;
+		num >>= 7;
+	}
+
+	buf[i++] = (uint8_t)(num);
+
+	return i;
 }
+
+size_t decode(const uint8_t buf[], size_t size_max, uint64_t *num){
+	if (size_max == 0)
+		return 0;
+
+	if (size_max > 9)
+		size_max = 9;
+
+	*num = buf[0] & 0x7F;
+	size_t i = 0;
+
+	while (buf[i++] & 0x80) {
+		if (i >= size_max || buf[i] == 0x00)
+			return 0;
+
+		*num |= (uint64_t)(buf[i] & 0x7F) << (i * 7);
+	}
+
+	return i;
+}
+
+// TODO: THIS HAS NOT BEEN MODIFIED YET. This is straight from BZ2
+void* getblock_xz(char* filename, int blocknum, struct blockmap* offsets) {
+	
+	void* blockbuf = (char*) malloc(((offsets->blocklocations)[blocknum]).uncompressedSize); // Build a buffer to hold a single block
+
+	// Read a single block into the buffer
+	int err = uncompressblock( filename, ((offsets->blocklocations)[blocknum]).position,
+						blockbuf );
+
+	if (!err){
+		return blockbuf;
+	}
+	else {
+		return NULL;
+	}
+}
+
 
 int analyze_xz(char* f_name) {
 
@@ -120,11 +189,7 @@ int analyze_xz(char* f_name) {
 		dberror = 1;
 	}
 
-	// First, check the STREAM header and footer to verify that the XZ archive is not corrupt,
-	// as dictated by the XZ file format documentation
-
-
-
+	// TODO
 
 	return 0;
 }
