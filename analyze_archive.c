@@ -26,8 +26,8 @@ int ext_error(int err_type, char* error_string){
 			"Archive must have an appropriate file extension\n"
 			"----------------------------------\n"
 			"- Uncompressed TAR   archive: .tar\n"
-			"- Compressed   Bzip2 archive: .bz2\n"
-			"- Compressed   XZ    archive: .xz\n"
+			"- Compressed   Bzip2 archive: .tar.bz2, .tbz, .tbz2\n"
+			"- Compressed   XZ    archive: .tar.xz\n"
 			"----------------------------------\n", error_string);
 		return 1;
 	}

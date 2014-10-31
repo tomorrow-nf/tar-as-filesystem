@@ -27,15 +27,9 @@ int main() {
 	char* create_bzip2_files = "CREATE TABLE Bzip2_files (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
 	int bzip2_files_exists = 0;
 
-/*	
-	char* basetar = "CompGzip";
-	char* createcompgzip = "CREATE TABLE CompGzip (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
-	int compgzip_exists = 0;
-
-	char* basetar = "CompXZ";
-	char* createcompxz = "CREATE TABLE CompXZ (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	char* compxz = "CompXZ";
+	char* createcompxz = "CREATE TABLE CompXZ (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
 	int compxz_exists = 0;
-	*/
 
 	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection
 
@@ -114,7 +108,12 @@ int main() {
 				printf("Error: %s\n", mysql_error(&mysql));
 			}
 		}
-		//TODO add more tables
+		if(!compxz_exists) {
+			printf("CompXZ does not exist, creating\n");
+			if(mysql_query(&mysql, createcompxz)) {
+				printf("Error: %s\n", mysql_error(&mysql));
+			}
+		}
 
 		mysql_close(&mysql);
 	}
