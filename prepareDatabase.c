@@ -20,7 +20,7 @@ int main() {
 	int archivetable_exists = 0;
 
 	char* basetar = "UncompTar";
-	char* createbasetar = "CREATE TABLE UncompTar (ArchiveName VARCHAR(255), MemberName VARCHAR(255), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	char* createbasetar = "CREATE TABLE UncompTar (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
 	int basetar_exists = 0;
 
 	char* bzip2_files = "Bzip2_files";

@@ -27,7 +27,7 @@ int analyze_tar(char* f_name) {
 	memset(archive_end, 0, sizeof(archive_end));
 
 	// Information for TAR archive and member headers
-	char membername[MEMBERNAMESIZE];		// name of member file
+	char membername[5000];				// name of member file
 	char file_length_string[FILELENGTHFIELDSIZE];	// size of file in bytes (octal string)
 	long long int file_length;			// size of file in bytes (long int)
 	char trashbuffer[200];				// for unused fields
@@ -140,6 +140,33 @@ int analyze_tar(char* f_name) {
 				printf("file length (int): %lld\n", file_length);
 				bytes_read = bytes_read + FILELENGTHFIELDSIZE;
 
+				// CHECK FOR ././@LongLink
+				if(strcmp(membername, "././@LongLink") == 0) {
+					//skip to end of block
+					fseek(tarfile, 376, SEEK_CUR);
+					bytes_read = bytes_read + 376;
+					
+					//read the real filename
+					fread((void*)membername, file_length, 1, tarfile);
+					printf("real member name: %s\n", membername);
+					bytes_read = bytes_read + file_length;
+
+					//skip to end of block
+					fseek(tarfile, (512 - (file_length % 512)), SEEK_CUR);
+					bytes_read = bytes_read + (512 - (file_length % 512));
+
+					//skip to the real file length
+					fseek(tarfile, (MEMBERNAMESIZE + 24), SEEK_CUR);
+					bytes_read = bytes_read + (MEMBERNAMESIZE + 24);
+
+					//get length of file in bytes
+					fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
+					printf("real file length (string): %s\n", file_length_string);
+					file_length = strtoll(file_length_string, NULL, 8);
+					printf("real file length (int): %lld\n", file_length);
+					bytes_read = bytes_read + FILELENGTHFIELDSIZE;
+				}
+
 				//discard modify time and checksum (20 bytes)
 				fread((void*)trashbuffer, (sizeof(char) * 20), 1, tarfile);
 				bytes_read = bytes_read + (sizeof(char) * 20);
@@ -193,7 +220,7 @@ int analyze_tar(char* f_name) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES ('%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, '%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 					printf("%s\n", insQuery);
