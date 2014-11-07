@@ -24,7 +24,7 @@ int main() {
 	int basetar_exists = 0;
 
 	char* bzip2_files = "Bzip2_files";
-	char* create_bzip2_files = "CREATE TABLE Bzip2_files (ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ArchiveName, MemberName)) ENGINE=InnoDB";
+	char* create_bzip2_files = "CREATE TABLE Bzip2_files (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
 	int bzip2_files_exists = 0;
 
 /*	
