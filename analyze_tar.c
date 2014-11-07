@@ -28,13 +28,14 @@ int analyze_tar(char* f_name) {
 
 	// Information for TAR archive and member headers
 	char membername[5000];				// name of member file
-	char file_length_string[FILELENGTHFIELDSIZE];	// size of file in bytes (octal string)
 	long long int file_length;			// size of file in bytes (long int)
-	char trashbuffer[200];				// for unused fields
-	char link_flag;					// flag indicating this is a file link
-	char linkname[MEMBERNAMESIZE];			// name of linked file
-	char ustarflag[USTARFIELDSIZE];			// field indicating newer ustar format
-	char memberprefix[PREFIXSIZE];			// ustar includes a field for long names
+	char linkname[5000];				// name of linked file
+	struct headerblock header;
+
+	//long name and link flags
+	int the_name_is_long = 0;
+	int the_link_is_long = 0;
+	char tmp_name_buffer[100];
 
 	
 	// get local path to file
@@ -56,7 +57,7 @@ int analyze_tar(char* f_name) {
 		mysql_close(con);
 		return 1;
 	}
-
+	
 
 	tarfile = fopen(tar_filename, "r");
 	if(!tarfile) {
@@ -74,8 +75,16 @@ int analyze_tar(char* f_name) {
 
 			//check if file already exists and ask for permission to overwrite and remove references
 			sprintf(insQuery, "SELECT * from ArchiveList WHERE ArchiveName = '%s'", real_filename);
-			mysql_query(con, insQuery);
+			if(mysql_query(con, insQuery)) {
+				printf("Select error:\n%s\n", mysql_error(con));
+				printf("%s\n", insQuery);
+				fclose(tarfile);
+				mysql_close(con);
+				return 1;
+			}
+			
 			MYSQL_RES* result = mysql_store_result(con);
+			
 			if(mysql_num_rows(result) == 0) {
 				printf("File does not exist\n");
 				//file foes not exist, do nothing
@@ -121,94 +130,94 @@ int analyze_tar(char* f_name) {
 			}		
 
 			while(1) {
+				the_name_is_long = 0;
+				the_link_is_long = 0;
+
 				// Evaluate the tar header
 				printf("member header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
 
-				//get filename
-				fread((void*)membername, MEMBERNAMESIZE, 1, tarfile);
-				printf("member name: %s\n", membername);
-				bytes_read = bytes_read + MEMBERNAMESIZE;
 
-				//discard mode, uid, and gid (8 bytes each)
-				fread((void*)trashbuffer, (sizeof(char) * 24), 1, tarfile);
-				bytes_read = bytes_read + (sizeof(char) * 24);
-
-				//get length of file in bytes
-				fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
-				printf("file length (string): %s\n", file_length_string);
-				file_length = strtoll(file_length_string, NULL, 8);
-				printf("file length (int): %lld\n", file_length);
-				bytes_read = bytes_read + FILELENGTHFIELDSIZE;
+				//get tar header
+				fread((void*)(&header), sizeof(struct headerblock), 1, tarfile);
+				bytes_read = bytes_read + sizeof(struct headerblock);
 
 				// CHECK FOR ././@LongLink
-				if(strcmp(membername, "././@LongLink") == 0) {
-					//skip to end of block
-					fseek(tarfile, 376, SEEK_CUR);
-					bytes_read = bytes_read + 376;
+				if(strcmp(header.name, "././@LongLink") == 0) {
+					printf("found a LongLink\n");
+
+					//get length of name in bytes
+					file_length = strtoll(header.size, NULL, 8);
+					printf("LongLink's length (int): %lld\n", file_length);
 					
-					//read the real filename
-					fread((void*)membername, file_length, 1, tarfile);
-					printf("real member name: %s\n", membername);
+					//read the real name
+					if(header.typeflag[0] == 'K') {
+						fread((void*)linkname, file_length, 1, tarfile);
+						printf("the target of the link is: %s\n", linkname);
+						the_link_is_long = 1;
+					}
+					else if(header.typeflag[0] == 'L') {
+						fread((void*)membername, file_length, 1, tarfile);
+						printf("the name of the member is: %s\n", membername);
+						the_name_is_long = 1;
+					}
+					else {
+						//TODO PROBLEM
+					}
 					bytes_read = bytes_read + file_length;
 
 					//skip to end of block
 					fseek(tarfile, (512 - (file_length % 512)), SEEK_CUR);
 					bytes_read = bytes_read + (512 - (file_length % 512));
 
-					//skip to the real file length
-					fseek(tarfile, (MEMBERNAMESIZE + 24), SEEK_CUR);
-					bytes_read = bytes_read + (MEMBERNAMESIZE + 24);
+					//get the next header
+					fread((void*)(&header), sizeof(struct headerblock), 1, tarfile);
+					bytes_read = bytes_read + sizeof(struct headerblock);
+				}
+				if(strcmp(header.name, "././@LongLink") == 0) {
+					printf("found a LongLink\n");
 
-					//get length of file in bytes
-					fread((void*)file_length_string, FILELENGTHFIELDSIZE, 1, tarfile);
-					printf("real file length (string): %s\n", file_length_string);
-					file_length = strtoll(file_length_string, NULL, 8);
-					printf("real file length (int): %lld\n", file_length);
-					bytes_read = bytes_read + FILELENGTHFIELDSIZE;
+					//get length of name in bytes
+					file_length = strtoll(header.size, NULL, 8);
+					printf("LongLink's length (int): %lld\n", file_length);
+					
+					//read the real name
+					if(header.typeflag[0] == 'K') {
+						fread((void*)linkname, file_length, 1, tarfile);
+						printf("the target of the link is: %s\n", linkname);
+						the_link_is_long = 1;
+					}
+					else if(header.typeflag[0] == 'L') {
+						fread((void*)membername, file_length, 1, tarfile);
+						printf("the name of the member is: %s\n", membername);
+						the_name_is_long = 1;
+					}
+					else {
+						//TODO PROBLEM
+					}
+					bytes_read = bytes_read + file_length;
+
+					//skip to end of block
+					fseek(tarfile, (512 - (file_length % 512)), SEEK_CUR);
+					bytes_read = bytes_read + (512 - (file_length % 512));
+
+					//get the next header
+					fread((void*)(&header), sizeof(struct headerblock), 1, tarfile);
+					bytes_read = bytes_read + sizeof(struct headerblock);
 				}
 
-				//discard modify time and checksum (20 bytes)
-				fread((void*)trashbuffer, (sizeof(char) * 20), 1, tarfile);
-				bytes_read = bytes_read + (sizeof(char) * 20);
+				printf("Reading real member's information\n");
 
-				//get link flag (1 byte)
-				fread((void*)(&link_flag), sizeof(char), 1, tarfile);
-				printf("link flag: %c\n", link_flag);
-				bytes_read = bytes_read + sizeof(char);
+				//get length of file in bytes
+				file_length = strtoll(header.size, NULL, 8);
+				printf("member's data length (int): %lld\n", file_length);
 
-				//get linked filename (if flag set, otherwise this field is useless)
-				fread((void*)linkname, MEMBERNAMESIZE, 1, tarfile);
-				printf("link name: %s\n", linkname);
-				bytes_read = bytes_read + MEMBERNAMESIZE;
-
-				//get ustar flag and version, ignore version in check
-				fread((void*)ustarflag, USTARFIELDSIZE, 1, tarfile);
-				printf("ustar flag: %s\n", ustarflag);
-				bytes_read = bytes_read + USTARFIELDSIZE;
-
-				// if flag is ustar get rest of fields, else we went into data, go back
-				if(strncmp(ustarflag, "ustar", 5) == 0) {
-					//discard ustar data (80 bytes)
-					fread((void*)trashbuffer, (sizeof(char) * 80), 1, tarfile);
-					bytes_read = bytes_read + (sizeof(char) * 80);
-
-					//get ustar file prefix (may be nothing but /0)
-					fread((void*)memberprefix, PREFIXSIZE, 1, tarfile);
-					printf("file prefix: %s\n", memberprefix);
-					bytes_read = bytes_read + PREFIXSIZE;
-				}
-				else {
-					fseek(tarfile, (-8), SEEK_CUR); //go back 8 bytes
-					bytes_read = bytes_read - 8;
+				//get linked filename (if name was not long)
+				if(!the_name_is_long) {
+					strncpy(membername, header.name, 100);
+					membername[100] = '\0'; //force null terminated string
+					printf("member's name: %s\n", membername);
 				}
 
-				// Analyze the archive contents
-				//skip rest of 512 byte block
-				longtmp = 512 - (bytes_read % 512); //get bytes left till end of block
-				if(longtmp != 0) {
-					fseek(tarfile, longtmp, SEEK_CUR);
-					bytes_read = bytes_read + longtmp;
-				}
 
 				//reduce bytes read to below a gigabyte
 				if(bytes_read >= BYTES_IN_GB) {
@@ -220,7 +229,7 @@ int analyze_tar(char* f_name) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, '%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, file_length_string, link_flag);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, '%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, header.size, header.typeflag[0]);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 					printf("%s\n", insQuery);
