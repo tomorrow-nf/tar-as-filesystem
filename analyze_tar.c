@@ -35,7 +35,6 @@ int analyze_tar(char* f_name) {
 	//long name and link flags
 	int the_name_is_long = 0;
 	int the_link_is_long = 0;
-	char tmp_name_buffer[100];
 
 	
 	// get local path to file
@@ -109,12 +108,12 @@ int analyze_tar(char* f_name) {
 					return 1;
 				}
 				else {
-					sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
+					sprintf(insQuery, "DELETE FROM UncompTar WHERE ArchiveName = '%s'", real_filename);
 					if(mysql_query(con, insQuery)) {
 						printf("Delete error:\n%s\n", mysql_error(con));
 						dberror = 1;
 					}
-					sprintf(insQuery, "DELETE FROM UncompTar WHERE ArchiveName = '%s'", real_filename);
+					sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
 					if(mysql_query(con, insQuery)) {
 						printf("Delete error:\n%s\n", mysql_error(con));
 						dberror = 1;

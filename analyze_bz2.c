@@ -42,9 +42,9 @@ int analyze_bz2(char* f_name) {
 	memset(archive_end, 0, sizeof(archive_end));
 
 	// Information for BZ2 archive and member headers
-	char membername[MEMBERNAMESIZE];		// name of member file
+	char membername[5000];				// name of member file
 	long long int file_length;			// size of file in bytes (long int)
-	char linkname[MEMBERNAMESIZE];			// name of linked file
+	char linkname[5000];				// name of linked file
 
 	long int blocksize; // bz2 blocksize (inteval of 100 from 100kB to 900kB)
 	int bzerror; // bz2 error checking
@@ -53,6 +53,10 @@ int analyze_bz2(char* f_name) {
 	int datafromarchivecheck = 0; //if archivecheck had to backtrack
 	long int tmp_dataread;
 	struct headerblock header;
+
+	//long name and link flags
+	int the_name_is_long = 0;
+	int the_link_is_long = 0;
 
 	struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
 	block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * 200);
@@ -131,15 +135,15 @@ int analyze_bz2(char* f_name) {
 			mysql_close(con);
 			free(block_offsets->blocklocations);
 			free(block_offsets);
-			return 1;
+			return 0;
 		}
 		else {
-			sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
+			sprintf(insQuery, "DELETE FROM Bzip2_files WHERE ArchiveName = '%s'", real_filename);
 			if(mysql_query(con, insQuery)) {
 				printf("Delete error:\n%s\n", mysql_error(con));
 				dberror = 1;
 			}
-			sprintf(insQuery, "DELETE FROM Bzip2_files WHERE ArchiveName = '%s'", real_filename);
+			sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
 			if(mysql_query(con, insQuery)) {
 				printf("Delete error:\n%s\n", mysql_error(con));
 				dberror = 1;
@@ -170,7 +174,9 @@ int analyze_bz2(char* f_name) {
 
 	while (1){
 		// TAR HEADER SECTION - get tar header
-		char tmp_header_buffer[512];
+printf("BEGINNING FILE ANALYSIS\n");
+		the_name_is_long = 0;
+		the_link_is_long = 0;
 		
 		if(firstrun) {
 			firstrun = 0;
@@ -201,9 +207,111 @@ int analyze_bz2(char* f_name) {
 			}
 		}
 
-		// TAR HEADER SECTION - extract data from tmp_header_buffer
+		// TAR HEADER SECTION - extract data from header
+
+		// CHECK FOR ././@LongLink
+		int tmp_longlink_position = 0;
+		int position_incrementer = 0;
+		while(strcmp(header.name, "././@LongLink") == 0) {
+			printf("found a LongLink\n");
+
+			//get length of name in bytes, adjust to be at end of block
+			file_length = strtoll(header.size, NULL, 8);
+			if((file_length % 512) != 0) {
+				position_incrementer = file_length + (512 - (file_length % 512));
+			}
+			else {
+				position_incrementer = file_length;
+			}
+			printf("LongLink's length (int): %lld\n", file_length);
+
+			//copy longlink into proper area
+			if(remainingdata >= position_incrementer){
+				if(header.typeflag[0] == 'L') {
+					memcpy((void*) membername, (memblock + blockposition), file_length);
+printf("READING INTO MEMBERNAME\n");
+					the_name_is_long = 1;
+				}
+				else if(header.typeflag[0] == 'K') {
+					memcpy((void*) linkname, (memblock + blockposition), file_length);
+printf("READING INTO LINKNAME\n");
+					the_link_is_long = 1;
+				}
+				remainingdata = remainingdata - position_incrementer;
+				blockposition = blockposition + position_incrementer;
+			}
+			else {
+				tmp_dataread = remainingdata;
+				if(header.typeflag[0] == 'L') {
+					memcpy((void*) membername, (memblock + blockposition), (sizeof(char) * remainingdata));
+printf("READING INTO MEMBERNAME\n");
+					the_name_is_long = 1;
+				}
+				else if(header.typeflag[0] == 'K') {
+					memcpy((void*) linkname, (memblock + blockposition), (sizeof(char) * remainingdata));
+printf("READING INTO LINKNAME\n");
+					the_link_is_long = 1;
+				}
+				free(memblock);
+
+				blocknumber++;
+				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				if(memblock == NULL) {
+					mysql_close(con);
+					free(block_offsets->blocklocations);
+					free(block_offsets);
+					return 1;
+				}
+				remainingdata = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize;
+				blockposition = 0;
+
+				if(header.typeflag[0] == 'L') {
+					memcpy((void*)(((char*)membername) + tmp_dataread), (memblock + blockposition), (sizeof(char) * (file_length - tmp_dataread)));
+printf("READING INTO MEMBERNAME\n");
+					the_name_is_long = 1;
+				}
+				else if(header.typeflag[0] == 'K') {
+					memcpy((void*)(((char*)linkname) + tmp_dataread), (memblock + blockposition), (sizeof(char) * (file_length - tmp_dataread)));
+printf("READING INTO LINKNAME\n");
+					the_link_is_long = 1;
+				}
+				
+				remainingdata = remainingdata - (position_incrementer - tmp_dataread);
+				blockposition = blockposition + (position_incrementer - tmp_dataread);
+			}
+
+			// load in next header
+			if(remainingdata >= 512){
+				memcpy((void*) (&header), (memblock + blockposition), sizeof(header));
+				remainingdata = remainingdata - sizeof(header);
+				blockposition = blockposition + sizeof(header);
+			}
+			else {
+				tmp_dataread = remainingdata;
+				memcpy((void*) (&header), (memblock + blockposition), (sizeof(char) * remainingdata));
+				free(memblock);
+
+				blocknumber++;
+				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				if(memblock == NULL) {
+					mysql_close(con);
+					free(block_offsets->blocklocations);
+					free(block_offsets);
+					return 1;
+				}
+				remainingdata = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize;
+				blockposition = 0;
+	
+				memcpy((void*)(((char*)&header) + tmp_dataread), (memblock + blockposition), (sizeof(char) * (512 - tmp_dataread)));
+				remainingdata = remainingdata - (512 - tmp_dataread);
+				blockposition = blockposition + (512 - tmp_dataread);
+			}
+		}
+
 		//get filename
-		strncpy(membername, header.name, 100);
+		if(!the_name_is_long) {
+			strncpy(membername, header.name, 100);
+		}
 		printf("member name: %s\n", membername);
 
 		//get length of file in bytes
@@ -214,7 +322,10 @@ int analyze_bz2(char* f_name) {
 		printf("link flag: %c\n", header.typeflag[0]);
 
 		//get linked filename (if flag set, otherwise this field is useless)
-		printf("link name: %s\n", header.linkname);
+		if(!the_link_is_long) {
+			strncpy(linkname, header.linkname, 100);
+		}
+		printf("link name: %s\n", linkname);
 
 
 		// SKIP DATA SECTION - note the offset and skip the data
