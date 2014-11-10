@@ -10,23 +10,35 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include <lzma.h>
-#include "bzip_seek/bitmapstructs.h" //this is just for the block struct
+#include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
 #include "common_functions.h"
 
-// Various structs for handling XZ streams and blocks
-// Some are not built here as they are included in the XZ
-// source code
+// Struct for handling XZ streams. Blocks, indexes, etc. are
+// handled by liblzma structs
+// Stream format from official documentation:
+/*
++-+-+-+-+-+-+-+-+-+-+-+-+=======+=======+     +=======+=======+-+-+-+-+-+-+-+-+-+-+-+-+
+|     Stream Header     | Block | Block | ... | Block | Index |     Stream Footer     |
++-+-+-+-+-+-+-+-+-+-+-+-+=======+=======+     +=======+=======+-+-+-+-+-+-+-+-+-+-+-+-+
+*/
 struct xz_stream {
-	int flags;
+	uint8_t header_magic[6];
+	uint8_t footer_magic[2];
+
+	int stored_crc32;
+	int calculated_crc32;
+
+	//lzma_stream_flags flags; // Included in both header and footer
+
 	int stored_backward_size;
 	int real_backward_size;
-	struct blockmap blocks;
+
+	lzma_index_iter xzindex;
+
+	lzma_block* block;
+	struct blockmap xzblockmap;
 };
 
-struct xz_recordss {
-	size_t unpad_size;
-	size_t uncomp_size;
-};
 
 // Multibyte int handling, from
 // http://tukaani.org/xz/xz-file-format.txt
@@ -189,7 +201,85 @@ int analyze_xz(char* f_name) {
 		dberror = 1;
 	}
 
-	// TODO
+	// open the file
+	FILE* xzfile = fopen(tar_filename, "r");
+	if(!xzfile) {
+		printf("Unable to open file: %s\n", tar_filename);
+	}
 
+	int streamflag = 1; // Set to 0 when there are no more streams to analyze
+	int streampos = SEEK_END; // Initialize to the last stream
+	int streamsize = 0; // size of next stream. Initialize to 0. Pulled from index.
+	char posbuffer[5]; // Used to check for padding
+	int i, j;
+	// Expected magic bytes
+	uint8_t exp_head_mag[6] = { 0xFD, '7', 'z', 'X', 'Z', 0x00 };
+	uint8_t exp_foot_mag[2] = { 'Y', 'Z' };
+
+	struct xz_stream* stream; // the current stream
+
+	while(streamflag == 1){
+		// Skip to the end of the stream
+		fseek(xzfile, streamsize, streampos-5);
+		// Check for any null byte padding and adjust the current
+		// position accordingly and seek to it.
+		fread((void*) posbuffer, 1, 5, xzfile);
+		for (i = 4, j = 0; i >= 0; i--, j++){
+			if (posbuffer[i] != '\0'){
+				streampos = streampos - j;
+			}
+		}
+		fseek(xzfile, streamsize, streampos);
+		// Parse the footer of the current stream
+		//		Store the CRC32
+		// TODO: CALCULATE OUR OWN AND COMPARE
+		fread((void*)stream->stored_crc32, 4, 1, xzfile);
+		//		Store the backward size (size of index)
+		// TODO: Calculate size of the index and compare
+		fread((void*)stream->stored_backward_size, 4, 1, xzfile);
+		//		TODO: Store the stream flags
+		//fread((void*)stream->flags, 2, 1, xzfile);
+		// Skipping this for now. We shouldn't need them
+		fseek(xzfile, 2, SEEK_CUR);
+		//		Check whether magic bytes are valid
+		fread((void*)stream->footer_magic, 1, 6, xzfile);
+		for (i = 0; i < 1; i++){
+			if (stream->footer_magic[i] != exp_foot_mag[i]){
+				// TODO: errno
+				printf("ERROR: Invalid XZ file, aborting\n");
+				return 1;
+			}			
+		}
+
+		// Parse the index
+		// TODO: HOW DO
+
+		// Skip data, then parse the header of the current stream
+		// TODO: SKIP DATA
+
+		//		Check whether magic bytes are valid
+		fread((void*)stream->header_magic, 1, 6, xzfile);
+		for (i = 0; i < 5; i++){
+			if (stream->header_magic[i] != exp_head_mag[i]){
+				// TODO: errno
+				printf("ERROR: Invalid XZ file, aborting\n");
+				return 1;
+			}			
+		}
+		//		TODO: Store the stream flags
+		//fread((void*)stream->flags, 2, 1, xzfile);
+		// Skipping this for now. We shouldn't need them
+		fseek(xzfile, 2, SEEK_CUR);
+
+		//		Store the CRC32
+		// TODO: CALCULATE OUR OWN AND COMPARE
+		fread((void*)stream->stored_crc32, 4, 1, xzfile);
+
+
+
+		streampos = SEEK_CUR;
+	}
+
+	// TODO: Memory stuff
 	return 0;
 }
