@@ -81,6 +81,7 @@ int main() {
 				if(strcmp(row[0], archivetable) == 0) archivetable_exists = 1;
 				if(strcmp(row[0], basetar) == 0) basetar_exists = 1;
 				if(strcmp(row[0], bzip2_files) == 0) bzip2_files_exists = 1;
+				if(strcmp(row[0], compxz) == 0) compxz_exists = 1;
 				//TODO add more tables
 			}
 			mysql_free_result(response);
