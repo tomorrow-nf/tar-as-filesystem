@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
 
 	char* filename = argv[1]; 	// file to analyze
 	char* file_handle;
-	int problem_variable;
+	int problem_variable = 0;
 
 	// Check syntax
 	if (argc != 2){
