@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <fcntl.h>
 #include <inttypes.h>
 //#include <errno.h>
 #include <lzma.h>
@@ -21,6 +22,9 @@
 
 #define my_min(x, y) ((x) < (y) ? (x) : (y))
 #define my_max(x, y) ((x) > (y) ? (x) : (y))
+
+#define O_BINARY 0
+
 
 int user_abort = false;
 
@@ -169,8 +173,15 @@ static uint64_t memlimit_compress;
 /// Memory usage limit for decompression
 static uint64_t memlimit_decompress;
 
-uint64_t
-hardware_memlimit_get(enum operation_mode mode);
+uint64_t hardware_memlimit_get(enum operation_mode mode);
+file_pair* io_open_src(const char *src_name);
+bool is_empty_filename(const char *filename);
+
+const char stdin_filename[] = "(stdin)";
+bool opt_stdout = false;
+bool opt_force = false; 
+#define STDIN_FILENO (fileno(stdin))
+
 
 
 

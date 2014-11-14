@@ -367,3 +367,255 @@ hardware_memlimit_get(enum operation_mode mode)
 }
 
 
+file_pair* io_open_src(const char *src_name){
+	if (is_empty_filename(src_name))
+		return NULL;
+
+	// Since we have only one file open at a time, we can use
+	// a statically allocated structure.
+	static file_pair pair;
+
+	pair = (file_pair){
+		.src_name = src_name,
+		.dest_name = NULL,
+		.src_fd = -1,
+		.dest_fd = -1,
+		.src_eof = false,
+		.dest_try_sparse = false,
+		.dest_pending_sparse = 0,
+	};
+
+	const bool error = io_open_src_real(&pair);;
+
+	return error ? NULL : &pair;
+}
+
+bool
+is_empty_filename(const char *filename)
+{
+	if (filename[0] == '\0') {
+		//message_error(_("Empty filename, skipping"));
+		return true;
+	}
+
+	return false;
+}
+
+/// Opens the source file. Returns false on success, true on error.
+bool
+io_open_src_real(file_pair *pair)
+{
+	// There's nothing to open when reading from stdin.
+	if (pair->src_name == stdin_filename) {
+		pair->src_fd = STDIN_FILENO;
+#ifdef TUKLIB_DOSLIKE
+		setmode(STDIN_FILENO, O_BINARY);
+#endif
+		return false;
+	}
+
+	// Symlinks are not followed unless writing to stdout or --force
+	// was used.
+	const bool follow_symlinks = opt_stdout || opt_force;
+
+	// We accept only regular files if we are writing the output
+	// to disk too. bzip2 allows overriding this with --force but
+	// gzip and xz don't.
+	const bool reg_files_only = !opt_stdout;
+
+	// Flags for open()
+	int flags = O_RDONLY | O_BINARY | O_NOCTTY;
+
+#ifndef TUKLIB_DOSLIKE
+	// If we accept only regular files, we need to be careful to avoid
+	// problems with special files like devices and FIFOs. O_NONBLOCK
+	// prevents blocking when opening such files. When we want to accept
+	// special files, we must not use O_NONBLOCK, or otherwise we won't
+	// block waiting e.g. FIFOs to become readable.
+	if (reg_files_only)
+		flags |= O_NONBLOCK;
+#endif
+
+#if defined(O_NOFOLLOW)
+	if (!follow_symlinks)
+		flags |= O_NOFOLLOW;
+#elif !defined(TUKLIB_DOSLIKE)
+	// Some POSIX-like systems lack O_NOFOLLOW (it's not required
+	// by POSIX). Check for symlinks with a separate lstat() on
+	// these systems.
+	if (!follow_symlinks) {
+		struct stat st;
+		if (lstat(pair->src_name, &st)) {
+			message_error("%s: %s", pair->src_name,
+					strerror(errno));
+			return true;
+
+		} else if (S_ISLNK(st.st_mode)) {
+			message_warning(_("%s: Is a symbolic link, "
+					"skipping"), pair->src_name);
+			return true;
+		}
+	}
+#else
+	// Avoid warnings.
+	(void)follow_symlinks;
+#endif
+
+	// Try to open the file. If we are accepting non-regular files,
+	// unblock the caught signals so that open() can be interrupted
+	// if it blocks e.g. due to a FIFO file.
+	if (!reg_files_only)
+		;//signals_unblock();
+
+	// Maybe this wouldn't need a loop, since all the signal handlers for
+	// which we don't use SA_RESTART set user_abort to true. But it
+	// doesn't hurt to have it just in case.
+	do {
+		pair->src_fd = open(pair->src_name, flags);
+	} while (pair->src_fd == -1 && errno == EINTR && !user_abort);
+
+	if (!reg_files_only)
+		;//signals_block();
+
+	if (pair->src_fd == -1) {
+		// If we were interrupted, don't display any error message.
+		if (errno == EINTR) {
+			// All the signals that don't have SA_RESTART
+			// set user_abort.
+			assert(user_abort);
+			return true;
+		}
+
+#ifdef O_NOFOLLOW
+		// Give an understandable error message if the reason
+		// for failing was that the file was a symbolic link.
+		//
+		// Note that at least Linux, OpenBSD, Solaris, and Darwin
+		// use ELOOP to indicate that O_NOFOLLOW was the reason
+		// that open() failed. Because there may be
+		// directories in the pathname, ELOOP may occur also
+		// because of a symlink loop in the directory part.
+		// So ELOOP doesn't tell us what actually went wrong,
+		// and this stupidity went into POSIX-1.2008 too.
+		//
+		// FreeBSD associates EMLINK with O_NOFOLLOW and
+		// Tru64 uses ENOTSUP. We use these directly here
+		// and skip the lstat() call and the associated race.
+		// I want to hear if there are other kernels that
+		// fail with something else than ELOOP with O_NOFOLLOW.
+		bool was_symlink = false;
+
+#	if defined(__FreeBSD__) || defined(__DragonFly__)
+		if (errno == EMLINK)
+			was_symlink = true;
+
+#	elif defined(__digital__) && defined(__unix__)
+		if (errno == ENOTSUP)
+			was_symlink = true;
+
+#	elif defined(__NetBSD__)
+		if (errno == EFTYPE)
+			was_symlink = true;
+
+#	else
+		if (errno == ELOOP && !follow_symlinks) {
+			const int saved_errno = errno;
+			struct stat st;
+			if (lstat(pair->src_name, &st) == 0
+					&& S_ISLNK(st.st_mode))
+				was_symlink = true;
+
+			errno = saved_errno;
+		}
+#	endif
+
+		if (was_symlink)
+			;//message_warning(_("%s: Is a symbolic link, "
+			//		"skipping"), pair->src_name);
+		else
+#endif
+			// Something else than O_NOFOLLOW failing
+			// (assuming that the race conditions didn't
+			// confuse us).
+			//message_error("%s: %s", pair->src_name,
+			//		strerror(errno));
+
+		return true;
+	}
+
+#ifndef TUKLIB_DOSLIKE
+	// Drop O_NONBLOCK, which is used only when we are accepting only
+	// regular files. After the open() call, we want things to block
+	// instead of giving EAGAIN.
+	if (reg_files_only) {
+		flags = fcntl(pair->src_fd, F_GETFL);
+		if (flags == -1)
+			goto error_msg;
+
+		flags &= ~O_NONBLOCK;
+
+		if (fcntl(pair->src_fd, F_SETFL, flags) == -1)
+			goto error_msg;
+	}
+#endif
+
+	// Stat the source file. We need the result also when we copy
+	// the permissions, and when unlinking.
+	if (fstat(pair->src_fd, &pair->src_st))
+		goto error_msg;
+
+	if (S_ISDIR(pair->src_st.st_mode)) {
+		//message_warning(_("%s: Is a directory, skipping"),
+		//		pair->src_name);
+		goto error;
+	}
+
+	if (reg_files_only && !S_ISREG(pair->src_st.st_mode)) {
+		//message_warning(_("%s: Not a regular file, skipping"),
+		//		pair->src_name);
+		goto error;
+	}
+
+#ifndef TUKLIB_DOSLIKE
+	if (reg_files_only && !opt_force) {
+		if (pair->src_st.st_mode & (S_ISUID | S_ISGID)) {
+			// gzip rejects setuid and setgid files even
+			// when --force was used. bzip2 doesn't check
+			// for them, but calls fchown() after fchmod(),
+			// and many systems automatically drop setuid
+			// and setgid bits there.
+			//
+			// We accept setuid and setgid files if
+			// --force was used. We drop these bits
+			// explicitly in io_copy_attr().
+			//message_warning(_("%s: File has setuid or "
+			//		"setgid bit set, skipping"),
+			//		pair->src_name);
+			goto error;
+		}
+
+		if (pair->src_st.st_mode & S_ISVTX) {
+			;//message_warning(_("%s: File has sticky bit "
+			//		"set, skipping"),
+			//		pair->src_name);
+			goto error;
+		}
+
+		if (pair->src_st.st_nlink > 1) {
+			//message_warning(_("%s: Input file has more "
+			//		"than one hard link, "
+			//		"skipping"), pair->src_name);
+			goto error;
+		}
+	}
+#endif
+
+	return false;
+
+error_msg:
+	return false;
+
+error:
+	(void)close(pair->src_fd);
+	return true;
+}
