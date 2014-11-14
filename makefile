@@ -3,8 +3,12 @@ all: analyze_archive extract_tar_member extract_bz2_member prepareDatabase
 analyze_archive: bzip2map analyze_archive.o analyze_tar.o analyze_bz2.o analyze_xz.o common_functions.o
 	gcc -o build/analyze_archive build/analyze_archive.o build/analyze_tar.o build/analyze_bz2.o build/analyze_xz.o build/common_functions.o bzip_seek/bzip-table.o bzip_seek/micro-bunzip.o bzip_seek/seek-bunzip.o `mysql_config --libs`
 
+#produces necessary utilities from other code sources
+# bzip-table.o, micro-bunzip.o, seek-bunzip.o, xz-list.o
 bzip2map:
 	make bzip-table.o micro-bunzip.o seek-bunzip.o -C bzip_seek
+
+####################################################
 
 extract_tar_member: extract_tar_member.o common_functions.o
 	gcc -o build/extract_tar_member build/extract_tar_member.o build/common_functions.o `mysql_config --libs`

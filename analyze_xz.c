@@ -11,6 +11,8 @@
 #include <inttypes.h>
 #include <lzma.h>
 #include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
+#include "XZ_sourcecode/src/xz/list.h" //get xz functions
+
 #include "common_functions.h"
 
 // Struct for handling XZ streams. Blocks, indexes, etc. are
@@ -49,7 +51,6 @@ int analyze_xz(char* f_name) {
 	long int longtmp; 				// temporary variable for calculations
 	long long int longlongtmp; 		// temporary variable for calculations
 	int dberror = 0;                // indicate an error in analysis
-	struct headerblock header;
 
 	// End of archive check
 	char archive_end_check[512];
@@ -145,13 +146,8 @@ int analyze_xz(char* f_name) {
 		dberror = 1;
 	}
 
-	// open the file
-	FILE* xzfile = fopen(tar_filename, "r");
-	if(!xzfile) {
-		printf("Unable to open file: %s\n", tar_filename);
-	}
 
-	//TODO stuff here
+	//TODO create "file pair" object here
 
 	return 0;
 }
