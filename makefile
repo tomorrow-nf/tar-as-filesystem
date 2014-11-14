@@ -51,6 +51,12 @@ list_xzfile: list_xzfile.o
 list_xzfile.o: list_xzfile.c list_xzfile.h
 	gcc -c list_xzfile.c -llzma -o build/list_xzfile.o
 
+read_tar.o: read_tar.c common_functions.h
+	gcc -c `mysql_config --cflags` read_tar.c -o build/read_tar.o
+
+read_tar: read_tar.o common_functions.o
+	gcc -o build/read_tar build/read_tar.o build/common_functions.o `mysql_config --libs`
+
 clean:
 	rm -f *.o  build/* temp/*
 	make clean -C bzip_seek
