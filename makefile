@@ -43,6 +43,14 @@ analyze_tar.o: analyze_tar.c common_functions.h
 prepareDatabase.o: prepareDatabase.c
 	gcc -c `mysql_config --cflags` prepareDatabase.c -o build/prepareDatabase.o
 
+####################################################
+
+list_xzfile: list_xzfile.o
+	gcc -o build/list_xzfile build/list_xzfile.o -llzma 
+
+list_xzfile.o: list_xzfile.c list_xzfile.h
+	gcc -c list_xzfile.c -llzma -o build/list_xzfile.o
+
 clean:
 	rm -f *.o  build/* temp/*
 	make clean -C bzip_seek

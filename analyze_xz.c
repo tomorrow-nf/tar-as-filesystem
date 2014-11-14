@@ -11,8 +11,6 @@
 #include <inttypes.h>
 #include <lzma.h>
 #include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
-#include "XZ_sourcecode/src/xz/list.h" //get xz functions
-
 #include "common_functions.h"
 
 // Struct for handling XZ streams. Blocks, indexes, etc. are
