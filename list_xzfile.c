@@ -26,14 +26,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	//we have an xz file
-	XZfile = fopen(filename, "r");
-	if(!XZfile) {
-		printf("Unable to open file: %s\n", filename);
-		return 1;
-	}
+	file_pair *pair = io_open_src(filename);
+	if (pair == NULL)
+		return;
 
 	xz_file_info xfi = XZ_FILE_INFO_INIT;
-	parse_indexes(&xfi, XZfile);
+	parse_indexes(&xfi, pair);
 
 	//TODO more after parse_indexes is written
 }
