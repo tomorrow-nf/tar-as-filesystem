@@ -10,7 +10,6 @@
 int main(int argc, char* argv[]) {
 	char* filename = argv[1]; 	// file to analyze
 	char* file_handle;
-	FILE* XZfile;
 
 	// Set file extension
 	file_handle = strrchr(filename, '.');
@@ -366,3 +365,5 @@ hardware_memlimit_get(enum operation_mode mode)
 			? memlimit_compress : memlimit_decompress;
 	return memlimit != 0 ? memlimit : UINT64_MAX;
 }
+
+
