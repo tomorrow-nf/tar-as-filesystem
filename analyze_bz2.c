@@ -53,6 +53,7 @@ int analyze_bz2(char* f_name) {
 	int datafromarchivecheck = 0; //if archivecheck had to backtrack
 	long int tmp_dataread;
 	struct headerblock header;
+	unsigned long long int archive_id; //id associated with the archive being analyzed
 
 	//long name and link flags
 	int the_name_is_long = 0;
@@ -152,9 +153,14 @@ int analyze_bz2(char* f_name) {
 	}
 		
 	// file is not in database or it has been cleared from database
-	sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', '%s', 'timestamp')", real_filename, fullpath);
+	sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', 'timestamp')", real_filename, fullpath);
 	if(mysql_query(con, insQuery)) {
 		printf("Insert error:\n%s\n", mysql_error(con));
+		dberror = 1;
+	}
+	archive_id = mysql_insert_id(con);
+	if(archive_id == 0) {
+		printf("Archive Id error, was 0\n");
 		dberror = 1;
 	}
 
@@ -384,7 +390,7 @@ printf("READING INTO LINKNAME\n");
 		printf("file exists in %d blocks\n", numblocks);
 
 		// Build the query and submit it
-		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, '%s', '%s', %d, %llu, %ld, '%s', '%c')", real_filename, membername, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0]);
+		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, %llu, '%s', '%s', %d, %llu, %ld, '%s', '%c')", archive_id, real_filename, membername, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0]);
 		if(mysql_query(con, insQuery)) {
 			printf("Insert error:\n%s\n", mysql_error(con));
 			printf("%s\n", insQuery);

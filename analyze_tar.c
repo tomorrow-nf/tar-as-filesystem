@@ -31,6 +31,7 @@ int analyze_tar(char* f_name) {
 	long long int file_length;			// size of file in bytes (long int)
 	char linkname[5000];				// name of linked file
 	struct headerblock header;
+	unsigned long long int archive_id;
 
 	//long name and link flags
 	int the_name_is_long = 0;
@@ -122,9 +123,14 @@ int analyze_tar(char* f_name) {
 			}
 			
 			// file is not in database or it has been cleared from database
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES ('%s', '%s', 'timestamp')", real_filename, fullpath);
+			sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', 'timestamp')", real_filename, fullpath);
 			if(mysql_query(con, insQuery)) {
 				printf("Insert error:\n%s\n", mysql_error(con));
+				dberror = 1;
+			}
+			archive_id = mysql_insert_id(con);
+			if(archive_id == 0) {
+				printf("Archive Id error, was 0\n");
 				dberror = 1;
 			}		
 
@@ -228,7 +234,7 @@ int analyze_tar(char* f_name) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, '%s', '%s', %d, %ld, '%s', '%c')", real_filename, membername, GB_read, bytes_read, header.size, header.typeflag[0]);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', %d, %ld, '%s', '%c')", archive_id, real_filename, membername, GB_read, bytes_read, header.size, header.typeflag[0]);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 					printf("%s\n", insQuery);

@@ -16,19 +16,19 @@ int main() {
 
 	// table strings
 	char* archivetable = "ArchiveList"; // all tables follow: name, creation string, existence flag
-	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveName VARCHAR(255) PRIMARY KEY, ArchivePath VARCHAR(5000), Timestamp VARCHAR(40)) ENGINE=InnoDB";
+	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), ArchivePath VARCHAR(5000), Timestamp VARCHAR(40), PRIMARY KEY(ArchiveID), UNIQUE(ArchiveName)) ENGINE=InnoDB";
 	int archivetable_exists = 0;
 
 	char* basetar = "UncompTar";
-	char* createbasetar = "CREATE TABLE UncompTar (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
+	char* createbasetar = "CREATE TABLE UncompTar (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int basetar_exists = 0;
 
 	char* bzip2_files = "Bzip2_files";
-	char* create_bzip2_files = "CREATE TABLE Bzip2_files (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
+	char* create_bzip2_files = "CREATE TABLE Bzip2_files (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int bzip2_files_exists = 0;
 
 	char* compxz = "CompXZ";
-	char* createcompxz = "CREATE TABLE CompXZ (ID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (ID)) ENGINE=InnoDB";
+	char* createcompxz = "CREATE TABLE CompXZ (FileID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (FileID)) ENGINE=InnoDB";
 	int compxz_exists = 0;
 
 	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection
