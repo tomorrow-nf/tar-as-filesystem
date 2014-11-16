@@ -58,5 +58,5 @@ read_tar: read_tar.o common_functions.o
 	gcc -o build/read_tar build/read_tar.o build/common_functions.o `mysql_config --libs`
 
 clean:
-	rm -f *.o  build/* temp/*
+	rm -f *.o  build/* temp/* *.c~
 	make clean -C bzip_seek
