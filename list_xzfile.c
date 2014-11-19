@@ -33,6 +33,8 @@ int main(int argc, char* argv[]) {
 	parse_indexes(&xfi, pair);
 
 	//TODO more after parse_indexes is written
+	unsigned long long int streams = lzma_index_stream_count(xfi.idx);
+	printf("streams: %llu\n", streams);
 }
 
 bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
