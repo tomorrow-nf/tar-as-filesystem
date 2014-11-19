@@ -34,7 +34,11 @@ int main(int argc, char* argv[]) {
 
 	//TODO more after parse_indexes is written
 	unsigned long long int streams = lzma_index_stream_count(xfi.idx);
+	unsigned long long int number_of_blocks = lzma_index_block_count(xfi.idx);
+	unsigned long long int uncomprsize = lzma_index_uncompressed_size(xfi.idx);
 	printf("streams: %llu\n", streams);
+	printf("blocks : %llu\n", number_of_blocks);
+	printf("unCsize: %llu\n", uncomprsize);
 }
 
 bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
