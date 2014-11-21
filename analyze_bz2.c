@@ -511,7 +511,7 @@ printf("READING INTO LINKNAME\n");
 	int b_cur = 1;
 	for(b_cur=1;b_cur<=blocknumber;b_cur++) {
 		printf("storing block %d\n", b_cur);
-		sprintf(insQuery, "INSERT INTO Bzip2_blocks VALUES (%llu, '%s', %d, %llu, %d)", archive_id, real_filename, b_cur, ((block_offsets->blocklocations)[b_cur]).position, ((block_offsets->blocklocations)[b_cur]).uncompressedSize);
+		sprintf(insQuery, "INSERT INTO Bzip2_blocks VALUES (%llu, '%s', %d, %llu, %llu)", archive_id, real_filename, b_cur, ((block_offsets->blocklocations)[b_cur]).position, ((block_offsets->blocklocations)[b_cur]).uncompressedSize);
 		if(mysql_query(con, insQuery)) {
 			printf("Insert error:\n%s\n", mysql_error(con));
 			printf("%s\n", insQuery);

@@ -88,7 +88,13 @@ int fill_bitmap(char* filename, struct blockmap* offsets) {
 		printf("block  : %llu\n", blockno);
 		printf("unCsize: %llu\n", uncompsz);
 
-		//TODO fill blockmap structure
+		if((offsets->maxsize - 10) <= blockno) {
+			offsets->maxsize = (offsets->maxsize * 2);
+			offsets->blocklocations = (struct blocklocation*) realloc(offsets->blocklocations, (offsets->maxsize * sizeof(struct blocklocation)));
+		}
+
+		((offsets->blocklocations)[blockno]).position = 0;
+		((offsets->blocklocations)[blockno]).uncompressedSize = uncompsz;
 	}
 
 	close(pair->src_fd);
