@@ -5,42 +5,94 @@
 
 #include <errno.h>
 #include <assert.h>
+#include "bzip_seek/bitmapstructs.h"
 #include "list_xzfile.h"
 
 int main(int argc, char* argv[]) {
-	char* filename = argv[1]; 	// file to analyze
-	char* file_handle;
+	struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
+	block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * 200);
+	block_offsets->maxsize = 200;
+	fill_bitmap(argv[1], block_offsets);
 
-	// Set file extension
-	file_handle = strrchr(filename, '.');
-	if (!file_handle) {
-		return 1;
-	} 
-	else {
-		file_handle = file_handle + 1;
-	}
+	return 0;
+}
 
-	if(strcmp(file_handle, "xz") != 0) {
-		return 1;
-	}
 
-	//we have an xz file
+// uncompresses block number "blocknum" into buffer "buf"
+unsigned long long int grab_block(int blocknum, char* filename, void* buf, unsigned long long sizeOfbuf, unsigned long long data_to_discard) {
 	file_pair *pair = io_open_src(filename);
-	if (pair == NULL)
-		return;
+	if (pair == NULL) {
+		return 0;
+	}
 
 	xz_file_info xfi = XZ_FILE_INFO_INIT;
 	parse_indexes(&xfi, pair);
 
-	//TODO more after parse_indexes is written
+	//create iterator and move to desired block
+	lzma_index_iter iter;
+	lzma_index_iter_init(&iter, xfi.idx);
+	lzma_index_iter_rewind(&iter);
+
+	while (!lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK)) {
+		if(iter.block.number_in_stream != iter.block.number_in_file) {
+			return 1; //WE GOT PROBLEMS
+		}
+		if(iter.block.number_in_stream == blocknum) {
+			break; //iterator points to the block we want
+		}
+	}
+
+	//fill buf with uncompressed block
+
+
+	//close file
+	close(pair->src_fd);
+
+	//return how much data we uncompressed
+	return 0;
+}
+
+int fill_bitmap(char* filename, struct blockmap* offsets) {
+
+	file_pair *pair = io_open_src(filename);
+	if (pair == NULL) {
+		return 0;
+	}
+
+	xz_file_info xfi = XZ_FILE_INFO_INIT;
+	parse_indexes(&xfi, pair);
+
 	unsigned long long int streams = lzma_index_stream_count(xfi.idx);
 	unsigned long long int number_of_blocks = lzma_index_block_count(xfi.idx);
 	unsigned long long int uncomprsize = lzma_index_uncompressed_size(xfi.idx);
 	printf("streams: %llu\n", streams);
 	printf("blocks : %llu\n", number_of_blocks);
-	printf("unCsize: %llu\n", uncomprsize);
+	printf("unCsize: %llu\n\n", uncomprsize);
+
+	// if streams is not 1 error
+	if(streams != 1) {
+		return 1;
+	}
+
+	//create iterator
+	lzma_index_iter iter;
+	lzma_index_iter_init(&iter, xfi.idx);
+	lzma_index_iter_rewind(&iter);
+
+	while (!lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK)) {
+		if(iter.block.number_in_stream != iter.block.number_in_file) {
+			return 1; //WE GOT PROBLEMS
+		}
+		unsigned long long int blockno = iter.block.number_in_stream;
+		unsigned long long int uncompsz = iter.block.uncompressed_size;
+		printf("block  : %llu\n", blockno);
+		printf("unCsize: %llu\n", uncompsz);
+
+		//TODO fill blockmap structure
+	}
 
 	close(pair->src_fd);
+	return 0;
 }
 
 bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
