@@ -39,6 +39,8 @@ int main(int argc, char* argv[]) {
 	printf("streams: %llu\n", streams);
 	printf("blocks : %llu\n", number_of_blocks);
 	printf("unCsize: %llu\n", uncomprsize);
+
+	close(pair->src_fd);
 }
 
 bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
