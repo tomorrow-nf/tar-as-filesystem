@@ -17,6 +17,7 @@ int main(int argc, char* argv[]) {
 	void* reg_file = malloc(20480);
 	int reg_int = open("test/UNCOMPRESSEDtestarchive.tar", O_RDONLY);
 	read(reg_int, reg_file, 20480);
+	close(reg_int);
 
 	void* xzfile = grab_block(1, "test/xztestarchive.tar.xz");
 	if (memcmp(reg_file, xzfile, 20480) != 0){
@@ -66,9 +67,14 @@ void* grab_block(int blocknum, char* filename) {
 	char block_begin;
 	memcpy(&block_begin, in_buf, sizeof(char));
 
+	if(iter.stream.flags == NULL) {
+		printf("ERROR there are NO stream flags\n");
+		return NULL;
+	}
+
 	// Set values in the block that we know
 	this_block->version = 0;
-	//this_block->check = 1;
+	this_block->check = iter.stream.flags->check;
 	this_block->filters = malloc(sizeof(lzma_filter) * LZMA_FILTERS_MAX);
 	this_block->header_size = lzma_block_header_size_decode((uint8_t) block_begin);
 
@@ -79,6 +85,7 @@ void* grab_block(int blocknum, char* filename) {
 		return NULL;
 	}
 
+	/*
 	size_t in_pos, out_pos = 0;
 	size_t in_size = iter.block.total_size;
 	size_t out_size = iter.block.uncompressed_size;
@@ -88,7 +95,7 @@ void* grab_block(int blocknum, char* filename) {
 		printf("Error encountered decoding block body, aborting\n");
 		return NULL;
 	}
-
+	*/
 	//close file
 	close(pair->src_fd);
 
