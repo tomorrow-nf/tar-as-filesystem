@@ -9,17 +9,27 @@
 #include "list_xzfile.h"
 
 int main(int argc, char* argv[]) {
-	struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
+	/*struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
 	block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * 200);
 	block_offsets->maxsize = 200;
-	fill_bitmap(argv[1], block_offsets);
+	fill_bitmap(argv[1], block_offsets);*/
+
+	void* reg_file = malloc(20480);
+	int reg_int = open("test/UNCOMPRESSEDtestarchive.tar", O_RDONLY);
+	read(reg_int, reg_file, 20480);
+
+	void* xzfile = grab_block(1, "test/xztestarchive.tar.xz");
+	if (memcmp(reg_file, xzfile, 20480) != 0){
+		printf("ERROR\n");
+	}
+	else printf("SUCCESS\n");
 
 	return 0;
 }
 
 
 // uncompresses block number "blocknum" into buffer "buf"
-unsigned long long int grab_block(int blocknum, char* filename, void* buf, unsigned long long sizeOfbuf, unsigned long long data_to_discard) {
+void* grab_block(int blocknum, char* filename) {
 	file_pair *pair = io_open_src(filename);
 	if (pair == NULL) {
 		return 0;
@@ -35,21 +45,57 @@ unsigned long long int grab_block(int blocknum, char* filename, void* buf, unsig
 
 	while (!lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK)) {
 		if(iter.block.number_in_stream != iter.block.number_in_file) {
-			return 1; //WE GOT PROBLEMS
+			return NULL; //TODO: Error
 		}
 		if(iter.block.number_in_stream == blocknum) {
 			break; //iterator points to the block we want
 		}
 	}
 
-	//fill buf with uncompressed block
+	uint8_t* in_buf = (uint8_t*) malloc(iter.block.total_size);
+	uint8_t* out_buf = (uint8_t*) malloc(iter.block.uncompressed_size);
+	uint8_t buf[LZMA_BLOCK_HEADER_SIZE_MAX];
 
+	printf("DEBUG: in_buf size = %llu\n", iter.block.total_size);
+	printf("DEBUG: out_buf size = %llu\n", iter.block.uncompressed_size);
+
+	lseek(pair->src_fd, iter.block.compressed_file_offset, SEEK_SET);
+	read(pair->src_fd, in_buf, iter.block.total_size);
+
+	lzma_block* this_block = (lzma_block*) malloc(sizeof(lzma_block));
+	char block_begin;
+	memcpy(&block_begin, in_buf, sizeof(char));
+
+	// Set values in the block that we know
+	this_block->version = 0;
+	//this_block->check = 1;
+	this_block->filters = malloc(sizeof(lzma_filter) * LZMA_FILTERS_MAX);
+	this_block->header_size = lzma_block_header_size_decode((uint8_t) block_begin);
+
+	// Decode this block
+	if (lzma_block_header_decode(this_block, NULL, in_buf) != LZMA_OK){
+		// TODO: Detailed error checking
+		printf("Error encountered decoding block header, aborting\n");
+		return NULL;
+	}
+
+	size_t in_pos, out_pos = 0;
+	size_t in_size = iter.block.total_size;
+	size_t out_size = iter.block.uncompressed_size;
+
+	if (lzma_block_buffer_decode(this_block, NULL, in_buf, &in_pos, in_size, out_buf, &out_pos, out_size) != LZMA_OK){
+		// TODO: Detailed error checking
+		printf("Error encountered decoding block body, aborting\n");
+		return NULL;
+	}
 
 	//close file
 	close(pair->src_fd);
 
-	//return how much data we uncompressed
-	return 0;
+	free(in_buf);
+
+	// return the uncompressed data
+	return (void*) out_buf;
 }
 
 int fill_bitmap(char* filename, struct blockmap* offsets) {
@@ -100,6 +146,13 @@ int fill_bitmap(char* filename, struct blockmap* offsets) {
 	close(pair->src_fd);
 	return 0;
 }
+
+
+// The functions below are imported from the XZ source code (list.c) by Lasse Collin.
+// For now, Lasse suggested we import these functions to use them, but in the future,
+// THIS WILL NO LONGER WORK. Instead, the functionality will be built into the API
+// and if this project is maintained, the XZ handling will likely need to be done over
+// from the beginning.
 
 bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
 	//TODO write parse_indexes without the interdependencies of xz
@@ -350,8 +403,6 @@ bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
 		return true;
 }
 
-
-
 bool io_pread(file_pair *pair, io_buf *buf, size_t size, off_t pos){
 	// Using lseek() and read() is more portable than pread() and
 	// for us it is as good as real pread().
@@ -431,7 +482,6 @@ hardware_memlimit_get(enum operation_mode mode)
 			? memlimit_compress : memlimit_decompress;
 	return memlimit != 0 ? memlimit : UINT64_MAX;
 }
-
 
 file_pair* io_open_src(const char *src_name){
 	if (is_empty_filename(src_name))

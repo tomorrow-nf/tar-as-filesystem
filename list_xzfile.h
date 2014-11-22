@@ -182,7 +182,7 @@ bool opt_stdout = false;
 bool opt_force = false; 
 #define STDIN_FILENO (fileno(stdin))
 
-
+void* grab_block(int blocknum, char* filename);
 
 
 
