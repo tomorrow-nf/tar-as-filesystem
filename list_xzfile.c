@@ -20,8 +20,14 @@ int main(int argc, char* argv[]) {
 	close(reg_int);
 
 	void* xzfile = grab_block(1, "test/xztestarchive.tar.xz");
-	if (memcmp(reg_file, xzfile, 20480) != 0){
-		printf("ERROR, the two files did not match\n");
+
+	if (xzfile == NULL){
+		printf("ERROR: Null xzfile, aborting\n");
+		return 1;
+	}
+
+	else if (memcmp(reg_file, xzfile, 20480) != 0){
+		printf("ERROR: the two files did not match\n");
 	}
 	else printf("SUCCESS\n");
 
@@ -33,6 +39,7 @@ int main(int argc, char* argv[]) {
 void* grab_block(int blocknum, char* filename) {
 	file_pair *pair = io_open_src(filename);
 	if (pair == NULL) {
+		printf("ERROR: File not found\n");
 		return 0;
 	}
 
@@ -68,7 +75,7 @@ void* grab_block(int blocknum, char* filename) {
 	memcpy(&block_begin, in_buf, sizeof(char));
 
 	if(iter.stream.flags == NULL) {
-		printf("ERROR there are NO stream flags\n");
+		printf("ERROR: there are NO stream flags\n");
 		return NULL;
 	}
 
@@ -78,17 +85,34 @@ void* grab_block(int blocknum, char* filename) {
 		return NULL;
 	}
 
-	/*
 	size_t in_pos, out_pos = 0;
 	size_t in_size = iter.block.total_size;
 	size_t out_size = iter.block.uncompressed_size;
 
-	if (lzma_block_buffer_decode(this_block, NULL, in_buf, &in_pos, in_size, out_buf, &out_pos, out_size) != LZMA_OK){
+	/* FOR OUR OWN REFERENCE
+	* See base.h for details
+	* LZMA_OK = 0,
+	* LZMA_STREAM_END = 1,
+	* LZMA_NO_CHECK = 2,
+	* LZMA_UNSUPPORTED_CHECK = 3,
+	* LZMA_GET_CHECK = 4,
+	* LZMA_MEM_ERROR = 5,
+	* LZMA_MEMLIMIT_ERROR = 6,
+	* LZMA_FORMAT_ERROR = 7,
+	* LZMA_OPTIONS_ERROR = 8,
+	* LZMA_DATA_ERROR = 9,
+	* LZMA_BUF_ERROR = 10,
+	* LZMA_PROG_ERROR = 11,
+	*/
+
+	int lzmaret = lzma_block_buffer_decode(this_block, NULL, in_buf, &in_pos, in_size, out_buf, &out_pos, out_size);
+
+	if (lzmaret != LZMA_OK){
 		// TODO: Detailed error checking
-		printf("Error encountered decoding block body, aborting\n");
+		printf("Error code %d encountered while decoding block body, aborting\n", lzmaret);
 		return NULL;
 	}
-	*/
+
 	//close file
 	close(pair->src_fd);
 
@@ -417,7 +441,7 @@ bool parse_block_header(lzma_block* block, file_pair *pair, const lzma_index_ite
 	// the end of the Block (or even its Check field).
 	const uint32_t size = my_min(iter->block.total_size
 				- lzma_check_size(iter->stream.flags->check),
-			LZMA_BLOCK_HEADER_SIZE_MAX); //SEGFAULT HERE
+			LZMA_BLOCK_HEADER_SIZE_MAX);
 	io_buf buf;
 	
 	if (io_pread(pair, &buf, size, iter->block.compressed_file_offset))
