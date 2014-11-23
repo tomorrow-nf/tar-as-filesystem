@@ -85,6 +85,13 @@ void* grab_block(int blocknum, char* filename) {
 		return NULL;
 	}
 
+	int csizeret = lzma_block_compressed_size(this_block, iter.block.unpadded_size);
+	if (csizeret != LZMA_OK){
+		// TODO: Detailed error checking
+		printf("Error code %d encountered while decoding block compressed size, aborting\n", csizeret);
+		return NULL;
+	}
+
 	size_t in_pos, out_pos = 0;
 	size_t in_size = iter.block.total_size;
 	size_t out_size = iter.block.uncompressed_size;
