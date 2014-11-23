@@ -3,8 +3,8 @@ all: directories analyze_archive extract_tar_member extract_bz2_member prepareDa
 directories: 
 	mkdir -p build
 
-analyze_archive: bzip2map analyze_archive.o analyze_tar.o analyze_bz2.o analyze_xz.o common_functions.o
-	gcc -o build/analyze_archive build/analyze_archive.o build/analyze_tar.o build/analyze_bz2.o build/analyze_xz.o build/common_functions.o bzip_seek/bzip-table.o bzip_seek/micro-bunzip.o bzip_seek/seek-bunzip.o `mysql_config --libs`
+analyze_archive: list_xzfile.o bzip2map analyze_archive.o analyze_tar.o analyze_bz2.o analyze_xz.o common_functions.o
+	gcc -o build/analyze_archive build/analyze_archive.o build/analyze_tar.o build/analyze_bz2.o build/analyze_xz.o build/list_xzfile.o build/common_functions.o bzip_seek/bzip-table.o bzip_seek/micro-bunzip.o bzip_seek/seek-bunzip.o -llzma `mysql_config --libs`
 
 #produces necessary utilities from other code sources
 # bzip-table.o, micro-bunzip.o, seek-bunzip.o, xz-list.o
@@ -44,15 +44,12 @@ analyze_tar.o: analyze_tar.c common_functions.h
 	gcc -c `mysql_config --cflags` analyze_tar.c -o build/analyze_tar.o
 
 prepareDatabase.o: prepareDatabase.c
-	gcc -c `mysql_config --cflags` prepareDatabase.c -o build/prepareDatabase.o
-
-####################################################
-
-list_xzfile: list_xzfile.o
-	gcc -o build/list_xzfile build/list_xzfile.o -llzma 
+	gcc -c `mysql_config --cflags` prepareDatabase.c -o build/prepareDatabase.o 
 
 list_xzfile.o: list_xzfile.c list_xzfile.h
 	gcc -c list_xzfile.c -llzma -o build/list_xzfile.o
+
+####################################################
 
 read_tar.o: read_tar.c common_functions.h
 	gcc -c `mysql_config --cflags` read_tar.c -o build/read_tar.o

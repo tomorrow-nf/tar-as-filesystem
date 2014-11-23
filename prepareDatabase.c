@@ -32,8 +32,12 @@ int main() {
 	int bzip2_blocks_exists = 0;
 
 	char* compxz = "CompXZ";
-	char* createcompxz = "CREATE TABLE CompXZ (FileID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), MemberName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (FileID)) ENGINE=InnoDB";
+	char* createcompxz = "CREATE TABLE CompXZ (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int compxz_exists = 0;
+
+	char* compxz_blocks = "CompXZ_blocks";
+	char* create_compxz_blocks = "CREATE TABLE CompXZ_blocks (ArchiveID INT, ArchiveName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, BlockSize BIGINT, PRIMARY KEY (ArchiveID, Blocknumber), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
+	int compxz_blocks_exists = 0;
 
 	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection
 
@@ -87,7 +91,7 @@ int main() {
 				if(strcmp(row[0], bzip2_files) == 0) bzip2_files_exists = 1;
 				if(strcmp(row[0], bzip2_blocks) == 0) bzip2_blocks_exists = 1;
 				if(strcmp(row[0], compxz) == 0) compxz_exists = 1;
-				//TODO add more tables
+				if(strcmp(row[0], compxz_blocks) == 0) compxz_blocks_exists = 1;
 			}
 			mysql_free_result(response);
 		}
@@ -123,6 +127,12 @@ int main() {
 		if(!compxz_exists) {
 			printf("CompXZ does not exist, creating\n");
 			if(mysql_query(&mysql, createcompxz)) {
+				printf("Error: %s\n", mysql_error(&mysql));
+			}
+		}
+		if(!compxz_blocks_exists) {
+			printf("Compxz_blocks does not exist, creating\n");
+			if(mysql_query(&mysql, create_compxz_blocks)) {
 				printf("Error: %s\n", mysql_error(&mysql));
 			}
 		}

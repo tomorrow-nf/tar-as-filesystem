@@ -10,7 +10,7 @@
 #include "bzip_seek/bitmapstructs.h"
 #include "common_functions.h"
 
-void* getblock(char* filename, int blocknum, struct blockmap* offsets) {
+void* getblock_bzip(char* filename, int blocknum, struct blockmap* offsets) {
 	
 	void* blockbuf = (char*) malloc(((offsets->blocklocations)[blocknum]).uncompressedSize); // Build a buffer to hold a single block
 
@@ -171,7 +171,7 @@ int analyze_bz2(char* f_name) {
 
 	// Get a block as a char pointer for easy byte incrementing
 	blocknumber++;
-	char* memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+	char* memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 	if(memblock == NULL) {
 		mysql_close(con);
 		free(block_offsets->blocklocations);
@@ -202,7 +202,7 @@ printf("BEGINNING FILE ANALYSIS\n");
 				free(memblock);
 
 				blocknumber++;
-				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 				if(memblock == NULL) {
 					mysql_close(con);
 					free(block_offsets->blocklocations);
@@ -266,7 +266,7 @@ printf("READING INTO LINKNAME\n");
 				free(memblock);
 
 				blocknumber++;
-				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 				if(memblock == NULL) {
 					mysql_close(con);
 					free(block_offsets->blocklocations);
@@ -303,7 +303,7 @@ printf("READING INTO LINKNAME\n");
 				free(memblock);
 
 				blocknumber++;
-				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 				if(memblock == NULL) {
 					mysql_close(con);
 					free(block_offsets->blocklocations);
@@ -369,7 +369,7 @@ printf("READING INTO LINKNAME\n");
 			free(memblock);
 			while(1) {
 				blocknumber++;
-				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 				numblocks++;
 				int sizeoftheblock = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize;
 
@@ -447,7 +447,7 @@ printf("READING INTO LINKNAME\n");
 			free(memblock);
 
 			blocknumber++;
-			memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+			memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 			if(memblock == NULL) {
 				mysql_close(con);
 				free(block_offsets->blocklocations);
@@ -476,7 +476,7 @@ printf("READING INTO LINKNAME\n");
 				free(memblock);
 
 				blocknumber++;
-				memblock = (char*) getblock(tar_filename, blocknumber, block_offsets);
+				memblock = (char*) getblock_bzip(tar_filename, blocknumber, block_offsets);
 				if(memblock == NULL) {
 					mysql_close(con);
 					free(block_offsets->blocklocations);

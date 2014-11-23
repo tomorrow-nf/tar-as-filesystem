@@ -7,19 +7,21 @@
 #include <assert.h>
 #include "bzip_seek/bitmapstructs.h"
 #include "list_xzfile.h"
+#include "xzfuncs.h"
 
+/*
 int main(int argc, char* argv[]) {
 	/*struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
 	block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * 200);
 	block_offsets->maxsize = 200;
 	fill_bitmap(argv[1], block_offsets);*/
-
+/*
 	void* reg_file = malloc(20480);
 	int reg_int = open("test/UNCOMPRESSEDtestarchive.tar", O_RDONLY);
 	read(reg_int, reg_file, 20480);
 	close(reg_int);
 
-	void* xzfile = grab_block(1, "test/xztestarchive.tar.xz");
+	void* xzfile = grab_block(1, "test/UNCOMPRESSEDtestarchive.tar.xz");
 
 	if (xzfile == NULL){
 		printf("ERROR: Null xzfile, aborting\n");
@@ -28,12 +30,14 @@ int main(int argc, char* argv[]) {
 
 	else if (memcmp(reg_file, xzfile, 20480) != 0){
 		printf("ERROR: the two files did not match\n");
+		int xzfd = open("test/uncmped.tar", O_CREAT | O_RDWR);
+		write(xzfd, xzfile, 20480);
+		close(xzfd);
 	}
 	else printf("SUCCESS\n");
 
 	return 0;
-}
-
+}*/
 
 // uncompresses block number "blocknum" into buffer "buf"
 void* grab_block(int blocknum, char* filename) {
@@ -53,6 +57,7 @@ void* grab_block(int blocknum, char* filename) {
 
 	while (!lzma_index_iter_next(&iter, LZMA_INDEX_ITER_BLOCK)) {
 		if(iter.block.number_in_stream != iter.block.number_in_file) {
+			close(pair->src_fd);
 			return NULL; //TODO: Error
 		}
 		if(iter.block.number_in_stream == blocknum) {
@@ -76,12 +81,20 @@ void* grab_block(int blocknum, char* filename) {
 
 	if(iter.stream.flags == NULL) {
 		printf("ERROR: there are NO stream flags\n");
+		free(in_buf);
+		free(this_block->filters); //malloc'ed in parse_block_header but needed in this function
+		free(this_block);
+		close(pair->src_fd);
 		return NULL;
 	}
 
 	// Decode this block
 	if (parse_block_header(this_block, pair, &iter)){
 		printf("Error encountered decoding block header, aborting\n");
+		free(in_buf);
+		free(this_block->filters); //malloc'ed in parse_block_header but needed in this function
+		free(this_block);
+		close(pair->src_fd);
 		return NULL;
 	}
 
@@ -89,10 +102,15 @@ void* grab_block(int blocknum, char* filename) {
 	if (csizeret != LZMA_OK){
 		// TODO: Detailed error checking
 		printf("Error code %d encountered while decoding block compressed size, aborting\n", csizeret);
+		free(in_buf);
+		free(this_block->filters); //malloc'ed in parse_block_header but needed in this function
+		free(this_block);
+		close(pair->src_fd);
 		return NULL;
 	}
 
-	size_t in_pos, out_pos = 0;
+	size_t in_pos = this_block->header_size; 
+	size_t out_pos = 0;
 	size_t in_size = iter.block.total_size;
 	size_t out_size = iter.block.uncompressed_size;
 
@@ -117,6 +135,10 @@ void* grab_block(int blocknum, char* filename) {
 	if (lzmaret != LZMA_OK){
 		// TODO: Detailed error checking
 		printf("Error code %d encountered while decoding block body, aborting\n", lzmaret);
+		free(in_buf);
+		free(this_block->filters); //malloc'ed in parse_block_header but needed in this function
+		free(this_block);
+		close(pair->src_fd);
 		return NULL;
 	}
 
