@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
 	void* xzfile = grab_block(1, "test/xztestarchive.tar.xz");
 	if (memcmp(reg_file, xzfile, 20480) != 0){
-		printf("ERROR\n");
+		printf("ERROR, the two files did not match\n");
 	}
 	else printf("SUCCESS\n");
 
@@ -57,7 +57,7 @@ void* grab_block(int blocknum, char* filename) {
 	uint8_t* out_buf = (uint8_t*) malloc(iter.block.uncompressed_size);
 	uint8_t buf[LZMA_BLOCK_HEADER_SIZE_MAX];
 
-	printf("DEBUG: in_buf size = %llu\n", iter.block.total_size);
+	printf("DEBUG: in_buf (iter.block.total_size) size = %llu\n", iter.block.total_size);
 	printf("DEBUG: out_buf size = %llu\n", iter.block.uncompressed_size);
 
 	lseek(pair->src_fd, iter.block.compressed_file_offset, SEEK_SET);
@@ -72,15 +72,8 @@ void* grab_block(int blocknum, char* filename) {
 		return NULL;
 	}
 
-	// Set values in the block that we know
-	this_block->version = 0;
-	this_block->check = iter.stream.flags->check;
-	this_block->filters = malloc(sizeof(lzma_filter) * LZMA_FILTERS_MAX);
-	this_block->header_size = lzma_block_header_size_decode((uint8_t) block_begin);
-
 	// Decode this block
-	if (lzma_block_header_decode(this_block, NULL, in_buf) != LZMA_OK){
-		// TODO: Detailed error checking
+	if (parse_block_header(this_block, pair, &iter)){
 		printf("Error encountered decoding block header, aborting\n");
 		return NULL;
 	}
@@ -99,7 +92,10 @@ void* grab_block(int blocknum, char* filename) {
 	//close file
 	close(pair->src_fd);
 
+	//free malloc'ed stuff
 	free(in_buf);
+	free(this_block->filters); //malloc'ed in parse_block_header but needed in this function
+	free(this_block);
 
 	// return the uncompressed data
 	return (void*) out_buf;
@@ -410,26 +406,78 @@ bool parse_indexes(xz_file_info *xfi, file_pair *pair) {
 		return true;
 }
 
-bool io_pread(file_pair *pair, io_buf *buf, size_t size, off_t pos){
+/// \takes an newly created lzma block and fills it
+bool parse_block_header(lzma_block* block, file_pair *pair, const lzma_index_iter *iter)
+{
+#if IO_BUFFER_SIZE < LZMA_BLOCK_HEADER_SIZE_MAX
+#	error IO_BUFFER_SIZE < LZMA_BLOCK_HEADER_SIZE_MAX
+#endif
+	
+	// Get the whole Block Header with one read, but don't read past
+	// the end of the Block (or even its Check field).
+	const uint32_t size = my_min(iter->block.total_size
+				- lzma_check_size(iter->stream.flags->check),
+			LZMA_BLOCK_HEADER_SIZE_MAX); //SEGFAULT HERE
+	io_buf buf;
+	
+	if (io_pread(pair, &buf, size, iter->block.compressed_file_offset))
+		return true;
+
+	// Zero would mean Index Indicator and thus not a valid Block.
+	if (buf.u8[0] == 0)
+		return true;
+
+	// fill the block structure and decode Block Header Size.
+	lzma_filter* filters = (lzma_filter*) malloc(sizeof(lzma_filter) * (LZMA_FILTERS_MAX + 1));
+	block->version = 0;
+	block->check = iter->stream.flags->check;
+	block->filters = filters;
+
+	block->header_size = lzma_block_header_size_decode(buf.u8[0]);
+
+	// Decode the Block Header.
+	switch (lzma_block_header_decode(block, NULL, buf.u8)) {
+	case LZMA_OK:
+		break;
+
+	case LZMA_OPTIONS_ERROR:
+		free(filters);
+		return true;
+
+	case LZMA_DATA_ERROR:
+		free(filters);
+		return true;
+
+	default:
+		free(filters);
+		return true;
+	}
+
+	return false;
+}
+
+extern bool
+io_pread(file_pair *pair, io_buf *buf, size_t size, off_t pos)
+{
 	// Using lseek() and read() is more portable than pread() and
 	// for us it is as good as real pread().
-		if (lseek(pair->src_fd, pos, SEEK_SET) != pos) {
-			//message_error(_("%s: Error seeking the file: %s"),
+	if (lseek(pair->src_fd, pos, SEEK_SET) != pos) {
+		//message_error(_("%s: Error seeking the file: %s"),
 				//pair->src_name, strerror(errno));
-			return true;
-		}
+		return true;
+	}
 
-		const size_t amount = io_read(pair, buf, size);
-		if (amount == SIZE_MAX)
-			return true;
+	const size_t amount = io_read(pair, buf, size);
+	if (amount == SIZE_MAX)
+		return true;
 
-		if (amount != size) {
-			//message_error(_("%s: Unexpected end of file"),
+	if (amount != size) {
+		//message_error(_("%s: Unexpected end of file"),
 				//pair->src_name);
-			return true;
-		}
+		return true;
+	}
 
-		return false;
+	return false;
 }
 
 size_t
