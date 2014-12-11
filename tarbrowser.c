@@ -1,3 +1,14 @@
+#define FUSE_USE_VERSION 26
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifdef linux
+/* For pread()/pwrite()/utimensat() */
+#define _XOPEN_SOURCE 700
+#endif
+
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,6 +18,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/time.h>
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
 
 /*
 TAR-Browser: File system in userspace to examine the contents
