@@ -56,11 +56,20 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 // else return (-1 * EACCES);
 static int tar_access(const char *path, int mask)
 {
-	int res;
-	res = access(path, mask);
-	if (res == -1)
-		return -errno;
-	return 0;
+	//check if file exists
+	if(fileexists) {
+		if(mask == F_OK || mask == R_OK) {
+			return 0; //right permission
+		}
+		else {
+			return (-1 * EACCES); //wrong permission
+		}
+	}
+	else {
+		//file does not exist
+		return (-1 * ENOENT);
+	}
+	return -1; //SHOULD NEVER REACH HERE
 }
 //TODO:
 // perform operation of man readlink(2) 
@@ -97,122 +106,83 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
-// TODO: RETURN ERROR
+// attempts to make a special file
+// NOT ALLOWED
 static int tar_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-	int res;
-/* On Linux this could just be 'mknod(path, mode, rdev)' but this
-is more portable */
-	if (S_ISREG(mode)) {
-		res = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
-		if (res >= 0)
-			res = close(res);
-	} else if (S_ISFIFO(mode))
-	res = mkfifo(path, mode);
-	else
-		res = mknod(path, mode, rdev);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to create directory
+// NOT ALLOWED
 static int tar_mkdir(const char *path, mode_t mode)
 {
-	int res;
-	res = mkdir(path, mode);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to delete a file and the name its associated with
+// NOT ALLOWED
 static int tar_unlink(const char *path)
 {
-	int res;
-	res = unlink(path);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to remove a directory
+// NOT ALLOWED
 static int tar_rmdir(const char *path)
 {
-	int res;
-	res = rmdir(path);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to create symbolic link
 static int tar_symlink(const char *from, const char *to)
 {
-	int res;
-	res = symlink(from, to);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to rename an entity
 static int tar_rename(const char *from, const char *to)
 {
-	int res;
-	res = rename(from, to);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to create a hard link
 static int tar_link(const char *from, const char *to)
 {
-	int res;
-	res = link(from, to);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to change access permissions
 static int tar_chmod(const char *path, mode_t mode)
 {
-	int res;
-	res = chmod(path, mode);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to change owner of a file
 static int tar_chown(const char *path, uid_t uid, gid_t gid)
 {
-	int res;
-	res = lchown(path, uid, gid);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// attempt to truncate a file
 static int tar_truncate(const char *path, off_t size)
 {
-	int res;
-	res = truncate(path, size);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
-// TODO: RETURN ERROR
+
+// changes file timestamp
 #ifdef HAVE_UTIMENSAT
 static int tar_utimens(const char *path, const struct timespec ts[2])
 {
-	int res;
-/* don't use utime/utimes since they follow symlinks */
-	res = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
-	if (res == -1)
-		return -errno;
-	return 0;
+	return (-1 * EACCES); //write permission not allowed
 }
 #endif
 
 //TODO
-// if fi->flags != RD_ONLY return ERROR
-// else check for existance of file in appropriate table, if not found return ERROR
-//         else put file’s ID number into the fuse file structure
+// if file exists:
+//   if fi->flags != RD_ONLY return (-1 * EACCES);
+//   else return 0;
+// else return (-1 * ENOENT);
 static int tar_open(const char *path, struct fuse_file_info *fi)
 {
 	int res;
@@ -239,22 +209,13 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	close(fd);
 	return res;
 }
-// TODO: ERROR
+// attempt to open and write to a file
 static int tar_write(const char *path, const char *buf, size_t size,
 	off_t offset, struct fuse_file_info *fi)
 {
-	int fd;
-	int res;
-	(void) fi;
-	fd = open(path, O_WRONLY);
-	if (fd == -1)
-		return -errno;
-	res = pwrite(fd, buf, size, offset);
-	if (res == -1)
-		res = -errno;
-	close(fd);
-	return res;
+	return (-1 * EACCES); //write permission not allowed
 }
+
 // TODO: Mimic statvfs(2), http://linux.die.net/man/2/statvfs 
 static int tar_statfs(const char *path, struct statvfs *stbuf)
 {
@@ -264,22 +225,13 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 		return -errno;
 	return 0;
 }
-// TODO ERROR
+
+// weird not allowed file altering
 #ifdef HAVE_POSIX_FALLOCATE
 static int tar_fallocate(const char *path, int mode,
 	off_t offset, off_t length, struct fuse_file_info *fi)
 {
-	int fd;
-	int res;
-	(void) fi;
-	if (mode)
-		return -EOPNOTSUPP;
-	fd = open(path, O_WRONLY);
-	if (fd == -1)
-		return -errno;
-	res = -posix_fallocate(fd, offset, length);
-	close(fd);
-	return res;
+	return (-1 * EBADF);
 }
 #endif
 
