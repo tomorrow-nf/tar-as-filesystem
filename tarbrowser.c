@@ -56,6 +56,17 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 // else return (-1 * EACCES);
 static int tar_access(const char *path, int mask)
 {
+	/* DEBUG */
+	if(mask == F_OK) printf("Tested access level F_OK %s\n", path);
+	else if(mask == R_OK) printf("Tested access level R_OK %s\n", path);
+	else if(mask == W_OK) printf("Tested access level W_OK %s\n", path);
+	else if(mask == X_OK) printf("Tested access level X_OK %s\n", path);
+	else if(mask == (R_OK | W_OK)) printf("Tested access level R_OK | W_OK %s\n", path);
+	else if(mask == (R_OK | X_OK)) printf("Tested access level R_OK | X_OK %s\n", path);
+	else if(mask == (W_OK | X_OK)) printf("Tested access level W_OK | X_OK %s\n", path);
+	else if(mask == (W_OK | X_OK | R_OK)) printf("Tested access level R_OK | W_OK | X_OK %s\n", path);
+	/* DEBUG END */
+
 	//check if file exists
 	if(fileexists) {
 		if(mask == F_OK || mask == R_OK) {
@@ -83,6 +94,7 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	buf[res] = '\0';
 	return 0;
 }
+
 //TODO research more
 static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	off_t offset, struct fuse_file_info *fi)
@@ -110,6 +122,10 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 // NOT ALLOWED
 static int tar_mknod(const char *path, mode_t mode, dev_t rdev)
 {
+	/* DEBUG */
+	printf("attempted illegal operation mknod\n");
+	/* DEBUG END */
+
 	return (-1 * EACCES); //permission not allowed
 }
 
@@ -117,6 +133,9 @@ static int tar_mknod(const char *path, mode_t mode, dev_t rdev)
 // NOT ALLOWED
 static int tar_mkdir(const char *path, mode_t mode)
 {
+	/* DEBUG */
+	printf("attempted illegal operation mkdir\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //permission not allowed
 }
 
@@ -124,6 +143,9 @@ static int tar_mkdir(const char *path, mode_t mode)
 // NOT ALLOWED
 static int tar_unlink(const char *path)
 {
+	/* DEBUG */
+	printf("attempted illegal operation unlink\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
@@ -131,42 +153,63 @@ static int tar_unlink(const char *path)
 // NOT ALLOWED
 static int tar_rmdir(const char *path)
 {
+	/* DEBUG */
+	printf("attempted illegal operation rmdir\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
 // attempt to create symbolic link
 static int tar_symlink(const char *from, const char *to)
 {
+	/* DEBUG */
+	printf("attempted illegal operation symlink\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
 // attempt to rename an entity
 static int tar_rename(const char *from, const char *to)
 {
+	/* DEBUG */
+	printf("attempted illegal operation rename\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
 // attempt to create a hard link
 static int tar_link(const char *from, const char *to)
 {
+	/* DEBUG */
+	printf("attempted illegal operation link\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
 // attempt to change access permissions
 static int tar_chmod(const char *path, mode_t mode)
 {
+	/* DEBUG */
+	printf("attempted illegal operation chmod\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
 // attempt to change owner of a file
 static int tar_chown(const char *path, uid_t uid, gid_t gid)
 {
+	/* DEBUG */
+	printf("attempted illegal operation chown\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
 // attempt to truncate a file
 static int tar_truncate(const char *path, off_t size)
 {
+	/* DEBUG */
+	printf("attempted illegal operation truncate\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
@@ -174,6 +217,9 @@ static int tar_truncate(const char *path, off_t size)
 #ifdef HAVE_UTIMENSAT
 static int tar_utimens(const char *path, const struct timespec ts[2])
 {
+	/* DEBUG */
+	printf("attempted illegal operation utimens\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 #endif
@@ -213,6 +259,9 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 static int tar_write(const char *path, const char *buf, size_t size,
 	off_t offset, struct fuse_file_info *fi)
 {
+	/* DEBUG */
+	printf("attempted illegal operation write\n");
+	/* DEBUG END */
 	return (-1 * EACCES); //write permission not allowed
 }
 
@@ -231,6 +280,9 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 static int tar_fallocate(const char *path, int mode,
 	off_t offset, off_t length, struct fuse_file_info *fi)
 {
+	/* DEBUG */
+	printf("attempted illegal operation fallocate\n");
+	/* DEBUG END */
 	return (-1 * EBADF);
 }
 #endif
