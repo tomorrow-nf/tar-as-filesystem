@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "common_functions.h"
+#include "sqloptions.h"
 
 
 int main(int argc, char* argv[]) {
@@ -14,8 +15,12 @@ int main(int argc, char* argv[]) {
 	// Initial database connection
 	MYSQL *con = mysql_init(NULL);
 	mysql_init(con);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
 	printf("Connecting to database\n");
-	if(!mysql_real_connect(con, "localhost", "root", "root", "Tarfiledb", 0, NULL, 0)) {
+	if(!mysql_real_connect(&mysql, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		printf("Connection Failure: %s\n", mysql_error(con));
 		//exit, no point
 		mysql_close(con);

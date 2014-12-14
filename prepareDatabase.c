@@ -4,15 +4,23 @@
 #include <mysql.h>
 #include <stdio.h>
 #include <string.h>
+#include "sqloptions.h"
 
 int main() {
 	MYSQL mysql;
 	mysql_init(&mysql);
-	//mysql_options(); //maybe later
+	//read options from file
+	mysql_options(&mysql, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(&mysql, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
 
-	// database strings
-	char* database = "Tarfiledb";
-	char* createdatabase = "CREATE DATABASE Tarfiledb";
+	// connect
+	if(!mysql_real_connect(&mysql, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		printf("Connection Failure: %s\n", mysql_error(&mysql));
+		printf("\nA database called 'Tarfiledb' must exist.\n");
+		
+		mysql_close(&mysql);
+		return 1;
+	}
 
 	// table strings
 	char* archivetable = "ArchiveList"; // all tables follow: name, creation string, existence flag
@@ -39,41 +47,7 @@ int main() {
 	char* create_compxz_blocks = "CREATE TABLE CompXZ_blocks (ArchiveID INT, ArchiveName VARCHAR(255), Blocknumber INT, BlockOffset BIGINT, BlockSize BIGINT, PRIMARY KEY (ArchiveID, Blocknumber), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int compxz_blocks_exists = 0;
 
-	int connection = 2; //2 = connected to Tarfiledb, 1 = Tarfiledb successfully created, 0 = no connection
-
-	// connect(      sql structure,  host,      user, password, database, port, unix socket, client flag)
-	if(!mysql_real_connect(&mysql, "localhost", "root", "root", "Tarfiledb", 0, NULL, 0)) {
-		printf("Connection Failure: %s\n", mysql_error(&mysql));
-		connection = 0;
-
-		if(strcmp(mysql_error(&mysql), "Unknown database 'Tarfiledb'") == 0) {
-			printf("Database does not exist, trying to create\n");
-
-			mysql_close(&mysql);
-			mysql_init(&mysql);
-			if(!mysql_real_connect(&mysql, "localhost", "root", "root", "mysql", 0, NULL, 0)) {
-				printf("Connection Failure to root database: %s\n", mysql_error(&mysql));
-			}
-			else {
-				connection = 1; //connected to root database server
-				if(mysql_query(&mysql, createdatabase)) {
-					printf("Failed to create database: %s\n", mysql_error(&mysql));
-					connection = 0; //database not created, connection essentially failed
-				}
-			}
-			mysql_close(&mysql);
-		}
-	}
-
-	// we try to reconnect now that the database has been created
-	if(connection == 1) {
-		mysql_init(&mysql);
-		if(!mysql_real_connect(&mysql, "localhost", "root", "root", "Tarfiledb", 0, NULL, 0)) {
-			printf("Connection Failure: %s\n", mysql_error(&mysql));
-			connection = 0;
-			mysql_close(&mysql);
-		}
-	}
+	int connection = 2; //2=connected to Tarfiledb, 0=no connection
 
 	// if connection is not 0 "mysql" is now connected to Tarfiledb
 	if(connection) {

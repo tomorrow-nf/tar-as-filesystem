@@ -1,0 +1,5 @@
+[TarfiledbGroup]
+host		= localhost
+user		= root
+password	= root
+database	= Tarfiledb

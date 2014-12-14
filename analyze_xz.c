@@ -13,6 +13,7 @@
 #include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
 #include "common_functions.h"
 #include "xzfuncs.h"
+#include "sqloptions.h"
 
 // Struct for handling XZ streams. Blocks, indexes, etc. are
 // handled by liblzma structs
@@ -87,7 +88,11 @@ int analyze_xz(char* f_name) {
 	// connect to database, begin a transaction
 	MYSQL *con = mysql_init(NULL);
 	mysql_init(con);
-	if(!mysql_real_connect(con, "localhost", "root", "root", "Tarfiledb", 0, NULL, 0)) {
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		printf("Connection Failure: %s\n", mysql_error(con));
 		//exit, no point
 		mysql_close(con);
