@@ -24,7 +24,7 @@ int main() {
 
 	// table strings
 	char* archivetable = "ArchiveList"; // all tables follow: name, creation string, existence flag
-	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), ArchivePath VARCHAR(5000), Timestamp VARCHAR(40), PRIMARY KEY(ArchiveID), UNIQUE(ArchiveName)) ENGINE=InnoDB";
+	char* createarchivetable = "CREATE TABLE ArchiveList (ArchiveID INT AUTO_INCREMENT, ArchiveName VARCHAR(255), ArchivePath VARCHAR(5000), Timestamp VARCHAR(100), PRIMARY KEY(ArchiveID), UNIQUE(ArchiveName)) ENGINE=InnoDB";
 	int archivetable_exists = 0;
 
 	char* basetar = "UncompTar";

@@ -10,6 +10,9 @@
 #include <stddef.h>
 #include <inttypes.h>
 #include <lzma.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
 #include "common_functions.h"
 #include "xzfuncs.h"
@@ -29,7 +32,7 @@ void* getblock_xz(char* filename, int blocknum) {
 	return grab_block(blocknum, filename);
 }
 
-int analyze_xz(char* f_name) {
+int analyze_xz(char* f_name, struct stat filestats) {
 
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_filename = f_name; 	// file to analyze
@@ -165,7 +168,8 @@ int analyze_xz(char* f_name) {
 	}
 		
 	// file is not in database or it has been cleared from database
-	sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', 'timestamp')", real_filename, fullpath);
+	char* mod_time = ctime(&(filestats.st_mtime));
+	sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', '%s')", real_filename, fullpath, mod_time);
 	if(mysql_query(con, insQuery)) {
 		printf("Insert error:\n%s\n", mysql_error(con));
 		dberror = 1;

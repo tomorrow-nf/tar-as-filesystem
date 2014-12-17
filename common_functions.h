@@ -1,6 +1,10 @@
 #ifndef COMMON_FUNCTIONS_H
 #define COMMON_FUNCTIONS_H
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #define BYTES_IN_GB 1073741824
 #define MEMBERNAMESIZE (sizeof(char) * 100)
 #define FILELENGTHFIELDSIZE (sizeof(char) * 12)
@@ -31,9 +35,9 @@ struct headerblock {
 
 long long int strtolonglong(char* string);
 
-int analyze_tarfile(char* f_name);
-int analyze_bz2(char* f_name);
-int analyze_gzip(char* f_name);
-int analyze_xz(char* f_name);
+int analyze_tarfile(char* f_name, struct stat filestats);
+int analyze_bz2(char* f_name, struct stat filestats);
+//int analyze_gzip(char* f_name, struct stat filestats);
+int analyze_xz(char* f_name, struct stat filestats);
 
 #endif

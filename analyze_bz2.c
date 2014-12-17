@@ -7,6 +7,9 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "bzip_seek/bitmapstructs.h"
 #include "common_functions.h"
 #include "sqloptions.h"
@@ -27,7 +30,7 @@ void* getblock_bzip(char* filename, int blocknum, struct blockmap* offsets) {
 	}
 }
 
-int analyze_bz2(char* f_name) {
+int analyze_bz2(char* f_name, struct stat filestats) {
 
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_filename = f_name; 	// file to analyze
@@ -163,7 +166,8 @@ int analyze_bz2(char* f_name) {
 	}
 		
 	// file is not in database or it has been cleared from database
-	sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', 'timestamp')", real_filename, fullpath);
+	char* mod_time = ctime(&(filestats.st_mtime));
+	sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', '%s')", real_filename, fullpath, mod_time);
 	if(mysql_query(con, insQuery)) {
 		printf("Insert error:\n%s\n", mysql_error(con));
 		dberror = 1;

@@ -6,6 +6,9 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "common_functions.h"
 
 // File handle error checking
@@ -36,15 +39,29 @@ int ext_error(int err_type, char* error_string){
 
 int main(int argc, char* argv[]) {
 
-	char* filename = argv[1]; 	// file to analyze
-	char* file_handle;
-	int problem_variable = 0;
+	char* filename; 	// file to analyze
+	char* file_handle;	// .xz, .bz2, ect.
+	int problem_variable = 0;	// indicates error
+	struct stat filestats;	// important info about the file being analyzed
 
 	// Check syntax
 	if (argc != 2){
 		printf("ERROR: Syntax\n"
 			"Expected: analyze_archive <archive file name>\n");
 		return 1;
+	}
+	filename = argv[1];
+		
+	//check read permission and get stats
+	if(access(filename, R_OK) != 0) {
+		printf("Error, file could not be accessed with read permission\n");
+		return 1;
+	}
+	else {
+		if(lstat(filename, &filestats) != 0) {
+			printf("Error, getting statistics on file failed\n");
+			return 1;
+		}
 	}
 
 	// Set file extension
@@ -60,7 +77,7 @@ int main(int argc, char* argv[]) {
 	// Uncompressed tar archive
 	if(strcmp(file_handle, "tar") == 0) {
 		printf("ANALYZING %s ARCHIVE\n", file_handle);
-		problem_variable = analyze_tar(filename);
+		problem_variable = analyze_tar(filename, filestats);
 	}
 	// bzip2
 	else if(strcmp(file_handle, "bz2") == 0) {
@@ -68,21 +85,16 @@ int main(int argc, char* argv[]) {
 		file_handle = strrchr(filename, '.') - 3;
 		if(strcmp(file_handle, "tar.bz2") == 0) {
 			printf("ANALYZING %s ARCHIVE\n", file_handle);
-			problem_variable = analyze_bz2(filename);
+			problem_variable = analyze_bz2(filename, filestats);
 		}
 		else return ext_error(2, filename);
-	}
-	// check other valid tar.bz2 extensions
-	else if((strcmp(file_handle, "bz2") == 0) || (strcmp(file_handle, "bz2") == 0)) {
-		printf("ANALYZING %s ARCHIVE\n", file_handle);
-		problem_variable = analyze_bz2(filename);
 	}
 	// xz
 	else if(strcmp(file_handle, "xz") == 0) {
 		file_handle = strrchr(filename, '.') - 3;
 		if(strcmp(file_handle, "tar.xz") == 0) {
 			printf("ANALYZING %s ARCHIVE\n", file_handle);
-			problem_variable = analyze_xz(filename);
+			problem_variable = analyze_xz(filename, filestats);
 		}
 		else return ext_error(2, filename);
 	}

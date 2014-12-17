@@ -7,10 +7,14 @@
 #include <string.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
 #include "common_functions.h"
 #include "sqloptions.h"
 
-int analyze_tar(char* f_name) {
+int analyze_tar(char* f_name, struct stat filestats) {
 
     FILE* tarfile;
 	int GB_read = 0;         	  // number of gigabytes read so far
@@ -128,7 +132,9 @@ int analyze_tar(char* f_name) {
 			}
 			
 			// file is not in database or it has been cleared from database
-			sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', 'timestamp')", real_filename, fullpath);
+			char* mod_time = ctime(&(filestats.st_mtime));
+			sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', '%s')", real_filename, fullpath, mod_time);
+
 			if(mysql_query(con, insQuery)) {
 				printf("Insert error:\n%s\n", mysql_error(con));
 				dberror = 1;
