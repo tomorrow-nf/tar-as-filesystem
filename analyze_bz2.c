@@ -404,34 +404,38 @@ printf("READING INTO LINKNAME\n");
 		printf("file exists in %d blocks\n", numblocks);
 
 		//convert to a name and directory path
-		char* membername_nopath;
 		char membername_path[5000];
+		char membername_file[5000];
+		char* membername_ptr;
 
-		membername_nopath = strrchr(membername, '/');
-		if (!membername_nopath) {
-			membername_nopath = membername;
-			membername_path[0] = '/';
-			membername_path[1] = '\0';
-		} 
+		//add beginning /
+		sprintf(membername_path, "/%s", membername);
+
+		//if last character is / go back  2 /'s, otherwise go back 1
+		int slashes;
+		if(membername_path[strlen(membername_path) - 1] == '/') {
+			slashes = 2;
+		}
 		else {
-			membername_nopath++;
-			int membername_nopaths_length = strlen(membername_nopath);
-			int membername_length = strlen(membername);
-			membername_path[0] = '/';
-			int i = 1;
-			for(i=1;i<=(membername_length - membername_nopaths_length);i++) {
-				membername_path[i] = membername[i-1];
-			}
-			membername_path[i] = '\0';
+			slashes = 1;
 		}
-		if(strcmp("", membername_nopath) == 0) {
-			membername_nopath = " ";
+
+		//find breakpoint between filename and path
+		membername_ptr = &(membername_path[strlen(membername_path) - 1]);
+		while(1) {
+			if(*membername_ptr == '/') slashes--;
+			if(slashes == 0) break;
+			membername_ptr--;
 		}
+		membername_ptr++; //now points to beginning of file name
+		sprintf(membername_file, "%s", membername_ptr); //copy filename
+		*membername_ptr = '\0'; // truncate path string
+
 		printf("MEMBERNAME PATH: %s\n", membername_path);
-		printf("REAL MEMBERNAME: %s\n", membername_nopath);
+		printf("REAL MEMBERNAME: %s\n", membername_file);
 
 		// Build the query and submit it
-		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, '%s', '%c')", archive_id, real_filename, membername_nopath, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0]);
+		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, '%s', '%c')", archive_id, real_filename, membername_file, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0]);
 		if(mysql_query(con, insQuery)) {
 			printf("Insert error:\n%s\n", mysql_error(con));
 			printf("%s\n", insQuery);
