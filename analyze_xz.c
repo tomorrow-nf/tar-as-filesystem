@@ -413,10 +413,13 @@ printf("READING INTO LINKNAME\n");
 		//add beginning /
 		sprintf(membername_path, "/%s", membername);
 
-		//if last character is / go back  2 /'s, otherwise go back 1
+		//if last character is / kill it and set directory flag
 		int slashes;
+		char dirflag = 'N';
 		if(membername_path[strlen(membername_path) - 1] == '/') {
-			slashes = 2;
+			membername_path[strlen(membername_path) - 1] = '\0';
+			slashes = 1;
+			dirflag = 'Y';
 		}
 		else {
 			slashes = 1;
@@ -437,7 +440,7 @@ printf("READING INTO LINKNAME\n");
 		printf("REAL MEMBERNAME: %s\n", membername_file);
 
 		// Build the query and submit it
-		sprintf(insQuery, "INSERT INTO CompXZ VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, '%s', '%c')", archive_id, real_filename, membername_file, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0]);
+		sprintf(insQuery, "INSERT INTO CompXZ VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, '%s', '%c', '%c')", archive_id, real_filename, membername_file, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0], dirflag);
 		if(mysql_query(con, insQuery)) {
 			printf("Insert error:\n%s\n", mysql_error(con));
 			printf("%s\n", insQuery);

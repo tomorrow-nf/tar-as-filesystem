@@ -241,10 +241,13 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				//add beginning /
 				sprintf(membername_path, "/%s", membername);
 
-				//if last character is / go back  2 /'s, otherwise go back 1
+				//if last character is / kill it and set directory flag
 				int slashes;
+				char dirflag = 'N';
 				if(membername_path[strlen(membername_path) - 1] == '/') {
-					slashes = 2;
+					membername_path[strlen(membername_path) - 1] = '\0';
+					slashes = 1;
+					dirflag = 'Y';
 				}
 				else {
 					slashes = 1;
@@ -274,7 +277,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, '%s', '%c')", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, header.size, header.typeflag[0]);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, '%s', '%c', '%c')", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, header.size, header.typeflag[0], dirflag);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 					printf("%s\n", insQuery);

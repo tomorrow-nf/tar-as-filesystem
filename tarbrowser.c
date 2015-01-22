@@ -10,6 +10,7 @@
 #endif
 
 #include <fuse.h>
+#include <mysql.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,6 +22,7 @@
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
+#include "sqloptions.h"
 
 /*
 TAR-Browser: File system in userspace to examine the contents
@@ -96,6 +98,7 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 }
 
 //TODO research more
+// -extra slashes are omitted (ex. "/home/" becomes "/home"
 static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	off_t offset, struct fuse_file_info *fi)
 {
