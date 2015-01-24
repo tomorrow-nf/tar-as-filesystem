@@ -42,6 +42,57 @@ copyright and license information:
 		See the file COPYING.
 */
 
+// parses a path into useful strings
+// -path -- the path to be parsed, path is copied and the original string is unaffected
+// -archivename, filepath, filename -- pass in "pointers to char pointers", they are malloced in here 
+void parsepath(const char *path, char** archivename, char** filepath, char** filename) {
+	char* tmpstr = (char*) malloc(sizeof(char) * (strlen(path) + 1));
+	strcpy(tmpstr, path);
+
+	//case path = /
+	if(strcmp(tmpstr, "/") == 0) {
+	*archivename = NULL;
+	*filepath = NULL;
+	*filename = NULL;
+	}
+	else {
+		char* readptr = tmpstr;
+		readptr++; //move past initial /
+		
+		//get archive name
+		*archivename = (char*) malloc(sizeof(char) * 256);
+		char* writeptr = *archivename;
+		do {
+			*writeptr = *readptr;
+			writeptr++;
+			readptr++;
+		}while(*readptr != '/' && *readptr != '\0');
+		*writeptr = '\0';
+
+		//there is a path inside the tarfile
+		if(*readptr != '\0') {
+			*filepath = (char*) malloc(sizeof(char) * (strlen(readptr) + 2));
+			*filename = (char*) malloc(sizeof(char) * 257);
+			strcpy(*filepath, readptr);
+			
+			int i;
+			char* backtracking = *filepath;
+			for(i=0;i<(strlen(*filepath) - 1);i++) {
+				backtracking++;
+			}
+
+			while(*backtracking != '/') {
+				backtracking--;
+			}
+			backtracking++;
+			strcpy(*filename, backtracking);
+			*backtracking = '\0';
+		}
+	}
+
+	free(tmpstr);
+}
+
 // TODO: 
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
