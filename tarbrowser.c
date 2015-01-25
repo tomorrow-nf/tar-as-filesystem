@@ -96,12 +96,53 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 // TODO: 
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
-{
-	int res;
+{	
+	//original code
+	/*int res;
 	res = lstat(path, stbuf);
 	if (res == -1)
 		return -errno;
-	return 0;
+	return 0;*/
+
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
+	else {
+		//TODO
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 //TODO: 
 // if the file does not exist in the database return (-1 * ENOENT)
@@ -120,32 +161,100 @@ static int tar_access(const char *path, int mask)
 	else if(mask == (W_OK | X_OK | R_OK)) printf("Tested access level R_OK | W_OK | X_OK %s\n", path);
 	/* DEBUG END */
 
-	//check if file exists
-	if(fileexists) {
-		if(mask == F_OK || mask == R_OK) {
-			return 0; //right permission
-		}
-		else {
-			return (-1 * EACCES); //wrong permission
-		}
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
 	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
 	else {
-		//file does not exist
-		return (-1 * ENOENT);
+		//TODO
 	}
-	return -1; //SHOULD NEVER REACH HERE
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 //TODO:
 // perform operation of man readlink(2) 
 // http://linux.die.net/man/2/readlink 
 static int tar_readlink(const char *path, char *buf, size_t size)
 {
+	//original code
+	/*
 	int res;
 	res = readlink(path, buf, size - 1);
 	if (res == -1)
 		return -errno;
 	buf[res] = '\0';
 	return 0;
+	*/
+
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
+	else {
+		//TODO
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 
 //TODO research more
@@ -153,6 +262,8 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	off_t offset, struct fuse_file_info *fi)
 {
+	//original code
+	/*
 	DIR *dp;
 	struct dirent *de;
 	(void) offset;
@@ -169,7 +280,47 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			break;
 	}
 	closedir(dp);
-	return 0;
+	return 0; */
+
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
+	else {
+		//TODO
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 
 // attempts to make a special file
@@ -285,18 +436,62 @@ static int tar_utimens(const char *path, const struct timespec ts[2])
 // else return (-1 * ENOENT);
 static int tar_open(const char *path, struct fuse_file_info *fi)
 {
+	//original code
+	/*
 	int res;
 	res = open(path, fi->flags);
 	if (res == -1)
 		return -errno;
 	close(res);
-	return 0;
+	return 0; */
+
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
+	else {
+		//TODO
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 // TODO: read “size” bytes from the file after moving 
 // “offset” through the file, use math to determine the block
 static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	struct fuse_file_info *fi)
 {
+	//original code
+	/*
 	int fd;
 	int res;
 	(void) fi;
@@ -307,7 +502,47 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	if (res == -1)
 		res = -errno;
 	close(fd);
-	return res;
+	return res; */
+
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
+	else {
+		//TODO
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 // attempt to open and write to a file
 static int tar_write(const char *path, const char *buf, size_t size,
@@ -322,11 +557,54 @@ static int tar_write(const char *path, const char *buf, size_t size,
 // TODO: Mimic statvfs(2), http://linux.die.net/man/2/statvfs 
 static int tar_statfs(const char *path, struct statvfs *stbuf)
 {
+	// original code
+	/*
 	int res;
 	res = statvfs(path, stbuf);
 	if (res == -1)
 		return -errno;
 	return 0;
+	*/
+	
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		//TODO errornumber = ?;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+
+	// path is "/"
+	if(archivename == NULL) {
+		//TODO
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		//TODO
+	}
+	// path is /TarArchive.tar/more
+	else {
+		//TODO
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 
 // weird not allowed file altering
