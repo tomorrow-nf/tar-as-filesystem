@@ -123,6 +123,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -130,7 +131,25 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
+		sprintf(insQuery, "SELECT ArchivePath from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		if(mysql_query(con, insQuery)) {
+			//query error
+			errornumber = -ENOENT;
+		}
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(mysql_num_rows(result) == 0) {
+				//file does not exist, set not found error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_ROW row = mysql_fetch_row(result);
+				if(lstat(row[0], stbuf) == -1) {
+					errornumber = -errno;
+				}
+			}
+			mysql_free_result(result);
+		}
 	}
 	// path is /TarArchive.tar/more
 	else {
@@ -183,11 +202,27 @@ static int tar_access(const char *path, int mask)
 
 	// path is "/"
 	if(archivename == NULL) {
-		//TODO
+		errornumber = 0;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
+		sprintf(insQuery, "SELECT ArchivePath from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		if(mysql_query(con, insQuery)) {
+			//query error
+			errornumber = -ENOENT;
+		}
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(mysql_num_rows(result) == 0) {
+				//file does not exist, set not found error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_ROW row = mysql_fetch_row(result);
+				errornumber = 0;
+			}
+			mysql_free_result(result);
+		}
 	}
 	// path is /TarArchive.tar/more
 	else {
@@ -238,11 +273,11 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 
 	// path is "/"
 	if(archivename == NULL) {
-		//TODO
+		errornumber = -EINVAL;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
+		errornumber = -EINVAL;
 	}
 	// path is /TarArchive.tar/more
 	else {
