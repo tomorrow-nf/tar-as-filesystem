@@ -115,7 +115,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = -EACCES;
 		return errornumber;
 	}
 
@@ -139,7 +139,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = //TODO
+				errornumber = -EACCES;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -174,17 +174,6 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 // else return (-1 * EACCES);
 static int tar_access(const char *path, int mask)
 {
-	/* DEBUG */
-	if(mask == F_OK) printf("Tested access level F_OK %s\n", path);
-	else if(mask == R_OK) printf("Tested access level R_OK %s\n", path);
-	else if(mask == W_OK) printf("Tested access level W_OK %s\n", path);
-	else if(mask == X_OK) printf("Tested access level X_OK %s\n", path);
-	else if(mask == (R_OK | W_OK)) printf("Tested access level R_OK | W_OK %s\n", path);
-	else if(mask == (R_OK | X_OK)) printf("Tested access level R_OK | X_OK %s\n", path);
-	else if(mask == (W_OK | X_OK)) printf("Tested access level W_OK | X_OK %s\n", path);
-	else if(mask == (W_OK | X_OK | R_OK)) printf("Tested access level R_OK | W_OK | X_OK %s\n", path);
-	/* DEBUG END */
-
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
@@ -196,7 +185,7 @@ static int tar_access(const char *path, int mask)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = -EACCES;
 		return errornumber;
 	}
 
@@ -220,7 +209,7 @@ static int tar_access(const char *path, int mask)
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = //TODO
+				errornumber = -EACCES;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -273,7 +262,7 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = -EACCES;
 		return errornumber;
 	}
 
@@ -345,7 +334,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = 0;
 		return errornumber;
 	}
 
@@ -357,7 +346,6 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	// path is "/"
 	if(archivename == NULL) {
-		//TODO
 		sprintf(insQuery, "SELECT ArchiveName, ArchivePath from ArchiveList", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error, just stop and return nothing
@@ -541,7 +529,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = -EACCES;
 		return errornumber;
 	}
 
@@ -601,7 +589,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = -EACCES;
 		return errornumber;
 	}
 
@@ -664,7 +652,7 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		//TODO errornumber = ?;
+		errornumber = -EACCES;
 		return errornumber;
 	}
 
@@ -688,7 +676,7 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = //TODO
+				errornumber = -EACCES;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
