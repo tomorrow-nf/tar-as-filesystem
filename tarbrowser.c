@@ -199,6 +199,7 @@ static int tar_access(const char *path, int mask)
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -270,6 +271,7 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -309,8 +311,13 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	while ((de = readdir(dp)) != NULL) {
 		struct stat st;
 		memset(&st, 0, sizeof(st));
+
+		//can get these 2 from using lstat on file
 		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12;
+		st.st_mode = de->d_type << 12; 
+		
+		//buf : not touched
+		//de->d_name : a string name
 		if (filler(buf, de->d_name, &st, 0))
 			break;
 	}
@@ -336,6 +343,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -499,6 +507,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -558,6 +567,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -620,6 +630,7 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -627,7 +638,25 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
+		sprintf(insQuery, "SELECT ArchivePath from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		if(mysql_query(con, insQuery)) {
+			//query error
+			errornumber = -ENOENT;
+		}
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(mysql_num_rows(result) == 0) {
+				//file does not exist, set not found error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_ROW row = mysql_fetch_row(result);
+				if(statvfs(row[0], stbuf) == -1) {
+					errornumber = -errno;
+				}
+			}
+			mysql_free_result(result);
+		}
 	}
 	// path is /TarArchive.tar/more
 	else {
