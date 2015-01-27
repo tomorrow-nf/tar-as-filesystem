@@ -348,6 +348,33 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	// path is "/"
 	if(archivename == NULL) {
 		//TODO
+		sprintf(insQuery, "SELECT ArchiveName, ArchivePath from ArchiveList", archivename);
+		if(mysql_query(con, insQuery)) {
+			//query error, just stop and return nothing
+			errornumber = 0;
+		}
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(mysql_num_rows(result) == 0) {
+				//no results
+				errornumber = 0;
+			}
+			else {
+				//while there are rows to be fetched
+				MYSQL_ROW row;
+				while((row = mysql_fetch_row(result))) {
+					//get the real stats of the file
+					struct stat st;
+					memset(&st, 0, sizeof(st));
+					if(lstat(row[1], &st) == 0) {
+						//redefine as directory and pass to filler
+						st.st_mode = 16877 //directory w/ usual permissions;
+						if (filler(buf, row[0], &st, 0)) break;
+					}
+				}
+			}
+			mysql_free_result(result);
+		}
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
