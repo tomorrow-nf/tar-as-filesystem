@@ -138,17 +138,22 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
-			if(mysql_num_rows(result) == 0) {
-				//file does not exist, set not found error
-				errornumber = -ENOENT;
+			if(result == NULL) {
+				errornumber = //TODO
 			}
 			else {
-				MYSQL_ROW row = mysql_fetch_row(result);
-				if(lstat(row[0], stbuf) == -1) {
-					errornumber = -errno;
+				if(mysql_num_rows(result) == 0) {
+					//file does not exist, set not found error
+					errornumber = -ENOENT;
 				}
+				else {
+					MYSQL_ROW row = mysql_fetch_row(result);
+					if(lstat(row[0], stbuf) == -1) {
+						errornumber = -errno;
+					}
+				}
+				mysql_free_result(result);
 			}
-			mysql_free_result(result);
 		}
 	}
 	// path is /TarArchive.tar/more
@@ -214,15 +219,20 @@ static int tar_access(const char *path, int mask)
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
-			if(mysql_num_rows(result) == 0) {
-				//file does not exist, set not found error
-				errornumber = -ENOENT;
+			if(result == NULL) {
+				errornumber = //TODO
 			}
 			else {
-				MYSQL_ROW row = mysql_fetch_row(result);
-				errornumber = 0;
+				if(mysql_num_rows(result) == 0) {
+					//file does not exist, set not found error
+					errornumber = -ENOENT;
+				}
+				else {
+					MYSQL_ROW row = mysql_fetch_row(result);
+					errornumber = 0;
+				}
+				mysql_free_result(result);
 			}
-			mysql_free_result(result);
 		}
 	}
 	// path is /TarArchive.tar/more
@@ -355,25 +365,30 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
-			if(mysql_num_rows(result) == 0) {
-				//no results
+			if(result == NULL) {
 				errornumber = 0;
 			}
 			else {
-				//while there are rows to be fetched
-				MYSQL_ROW row;
-				while((row = mysql_fetch_row(result))) {
-					//get the real stats of the file
-					struct stat st;
-					memset(&st, 0, sizeof(st));
-					if(lstat(row[1], &st) == 0) {
-						//redefine as directory and pass to filler
-						st.st_mode = 16877 //directory w/ usual permissions;
-						if (filler(buf, row[0], &st, 0)) break;
+				if(mysql_num_rows(result) == 0) {
+					//no results
+					errornumber = 0;
+				}
+				else {
+					//while there are rows to be fetched
+					MYSQL_ROW row;
+					while((row = mysql_fetch_row(result))) {
+						//get the real stats of the file
+						struct stat st;
+						memset(&st, 0, sizeof(st));
+						if(lstat(row[1], &st) == 0) {
+							//redefine as directory and pass to filler
+							st.st_mode = 16877 //directory w/ usual permissions;
+							if (filler(buf, row[0], &st, 0)) break;
+						}
 					}
 				}
+				mysql_free_result(result);
 			}
-			mysql_free_result(result);
 		}
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
@@ -672,17 +687,22 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
-			if(mysql_num_rows(result) == 0) {
-				//file does not exist, set not found error
-				errornumber = -ENOENT;
+			if(result == NULL) {
+				errornumber = //TODO
 			}
 			else {
-				MYSQL_ROW row = mysql_fetch_row(result);
-				if(statvfs(row[0], stbuf) == -1) {
-					errornumber = -errno;
+				if(mysql_num_rows(result) == 0) {
+					//file does not exist, set not found error
+					errornumber = -ENOENT;
 				}
+				else {
+					MYSQL_ROW row = mysql_fetch_row(result);
+					if(statvfs(row[0], stbuf) == -1) {
+						errornumber = -errno;
+					}
+				}
+				mysql_free_result(result);
 			}
-			mysql_free_result(result);
 		}
 	}
 	// path is /TarArchive.tar/more
