@@ -4,7 +4,7 @@ directories:
 	mkdir -p build
 
 tarbrowser:
-	gcc -Wall tarbrowser.c `pkg-config fuse --cflags --libs` -o tarbrowser
+	gcc -Wall tarbrowser.c `pkg-config fuse --cflags --libs` `mysql_config --cflags --libs` -o build/tarbrowser
 
 analyze_archive: list_xzfile.o bzip2map analyze_archive.o analyze_tar.o analyze_bz2.o analyze_xz.o common_functions.o
 	gcc -o build/analyze_archive build/analyze_archive.o build/analyze_tar.o build/analyze_bz2.o build/analyze_xz.o build/list_xzfile.o build/common_functions.o bzip_seek/bzip-table.o bzip_seek/micro-bunzip.o bzip_seek/seek-bunzip.o -llzma `mysql_config --libs`

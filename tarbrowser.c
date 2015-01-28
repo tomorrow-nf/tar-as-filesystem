@@ -12,6 +12,7 @@
 #include <fuse.h>
 #include <mysql.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -128,10 +129,12 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	// path is "/"
 	if(archivename == NULL) {
 		//TODO
+		if (lstat(".", stbuf) == -1)
+			errornumber = -errno;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		sprintf(insQuery, "SELECT ArchivePath from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
 			errornumber = -ENOENT;
@@ -151,6 +154,13 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 					if(lstat(row[0], stbuf) == -1) {
 						errornumber = -errno;
 					}
+					//check timestamp
+					else {
+						char* mod_time = ctime(&(stbuf->st_mtime));
+						if(strcmp(row[1], mod_time) != 0) {
+							errornumber = -ENOENT;
+						}
+					}
 				}
 				mysql_free_result(result);
 			}
@@ -159,6 +169,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	// path is /TarArchive.tar/more
 	else {
 		//TODO
+		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -201,7 +212,7 @@ static int tar_access(const char *path, int mask)
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		sprintf(insQuery, "SELECT ArchivePath from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
 			errornumber = -ENOENT;
@@ -218,7 +229,18 @@ static int tar_access(const char *path, int mask)
 				}
 				else {
 					MYSQL_ROW row = mysql_fetch_row(result);
-					errornumber = 0;
+					struct stat statbuff;
+					if(lstat(row[0], &statbuff) == -1) {
+						errornumber = -errno;
+					}
+					//check timestamp
+					else {
+						char* mod_time = ctime(&(statbuff.st_mtime));
+						if(strcmp(row[1], mod_time) != 0) {
+							errornumber = -ENOENT;
+						}
+						else errornumber = 0;
+					}
 				}
 				mysql_free_result(result);
 			}
@@ -226,7 +248,7 @@ static int tar_access(const char *path, int mask)
 	}
 	// path is /TarArchive.tar/more
 	else {
-		//TODO
+		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -283,6 +305,7 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	// path is /TarArchive.tar/more
 	else {
 		//TODO
+		errornumber = -EINVAL;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -346,7 +369,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	// path is "/"
 	if(archivename == NULL) {
-		sprintf(insQuery, "SELECT ArchiveName, ArchivePath from ArchiveList", archivename);
+		sprintf(insQuery, "SELECT ArchiveName, ArchivePath, Timestamp from ArchiveList");
 		if(mysql_query(con, insQuery)) {
 			//query error, just stop and return nothing
 			errornumber = 0;
@@ -370,8 +393,12 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 						memset(&st, 0, sizeof(st));
 						if(lstat(row[1], &st) == 0) {
 							//redefine as directory and pass to filler
-							st.st_mode = 16877 //directory w/ usual permissions;
-							if (filler(buf, row[0], &st, 0)) break;
+							st.st_mode = 16877; //directory w/ usual permissions;
+							//check timestamp
+							char* mod_time = ctime(&(st.st_mtime));
+							if(strcmp(row[2], mod_time) == 0) {
+								if (filler(buf, row[0], &st, 0)) break;
+							}
 						}
 					}
 				}
@@ -382,10 +409,12 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
 		//TODO
+		errornumber = -EACCES;
 	}
 	// path is /TarArchive.tar/more
 	else {
 		//TODO
+		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -542,14 +571,17 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 	// path is "/"
 	if(archivename == NULL) {
 		//TODO
+		errornumber = -EACCES;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
 		//TODO
+		errornumber = -EACCES;
 	}
 	// path is /TarArchive.tar/more
 	else {
 		//TODO
+		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -602,14 +634,17 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	// path is "/"
 	if(archivename == NULL) {
 		//TODO
+		errornumber = -EACCES;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
 		//TODO
+		errornumber = -EACCES;
 	}
 	// path is /TarArchive.tar/more
 	else {
 		//TODO
+		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -665,10 +700,12 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 	// path is "/"
 	if(archivename == NULL) {
 		//TODO
+		if (statvfs(".", stbuf) == -1)
+			errornumber = -errno;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		sprintf(insQuery, "SELECT ArchivePath from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
 			errornumber = -ENOENT;
@@ -688,6 +725,7 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 					if(statvfs(row[0], stbuf) == -1) {
 						errornumber = -errno;
 					}
+					//no timestamp in this stbuf
 				}
 				mysql_free_result(result);
 			}
@@ -696,6 +734,7 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 	// path is /TarArchive.tar/more
 	else {
 		//TODO
+		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
