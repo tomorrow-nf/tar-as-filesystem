@@ -1,5 +1,5 @@
 /*
-    Will accept a tar.xz file name and print out the files in the archive as well as their
+    Will accept a tar.xz or .txz file name and print out the files in the archive as well as their
     byte offsets and sizes (in bytes).
 */
 #include <mysql.h>

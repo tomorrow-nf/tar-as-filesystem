@@ -20,7 +20,7 @@ int ext_error(int err_type, char* error_string){
 			"----------------------------------\n"
 			"- Uncompressed TAR   archive: .tar\n"
 			"- Compressed   Bzip2 archive: .tar.bz2, .tbz, .tbz2\n"
-			"- Compressed   XZ    archive: .tar.xz\n"
+			"- Compressed   XZ    archive: .tar.xz, .txz\n"
 			"----------------------------------\n", error_string);
 		return 1;
 	}
@@ -30,7 +30,7 @@ int ext_error(int err_type, char* error_string){
 			"----------------------------------\n"
 			"- Uncompressed TAR   archive: .tar\n"
 			"- Compressed   Bzip2 archive: .tar.bz2, .tbz, .tbz2\n"
-			"- Compressed   XZ    archive: .tar.xz\n"
+			"- Compressed   XZ    archive: .tar.xz, .txz\n"
 			"----------------------------------\n", error_string);
 		return 1;
 	}
@@ -90,9 +90,9 @@ int main(int argc, char* argv[]) {
 		else return ext_error(2, filename);
 	}
 	// xz
-	else if(strcmp(file_handle, "xz") == 0) {
+	else if(strcmp(file_handle, "xz") == 0 || strcmp(file_handle, "txz") == 0) {
 		file_handle = strrchr(filename, '.') - 3;
-		if(strcmp(file_handle, "tar.xz") == 0) {
+		if(strcmp(file_handle, "tar.xz") == 0 || strcmp(file_handle, "txz") == 0) {
 			printf("ANALYZING %s ARCHIVE\n", file_handle);
 			problem_variable = analyze_xz(filename, filestats);
 		}

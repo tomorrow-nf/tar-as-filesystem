@@ -43,10 +43,14 @@ copyright and license information:
 		See the file COPYING.
 */
 
+//special variable to hold stats for top level directory
+struct stat topdir;
+
 // parses a path into useful strings
 // -path -- the path to be parsed, path is copied and the original string is unaffected
-// -archivename, filepath, filename -- pass in "pointers to char pointers", they are malloced in here 
-void parsepath(const char *path, char** archivename, char** filepath, char** filename) {
+// -archivename, filepath, filename -- pass in "pointers to char pointers", they are malloced in here
+// -file_ext -- the file extention, just a pointer pointing to the first . in archivename
+void parsepath(const char *path, char** archivename, char** filepath, char** filename, char** file_ext) {
 	char* tmpstr = (char*) malloc(sizeof(char) * (strlen(path) + 1));
 	strcpy(tmpstr, path);
 
@@ -55,6 +59,7 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 	*archivename = NULL;
 	*filepath = NULL;
 	*filename = NULL;
+	*file_ext = NULL;
 	}
 	else {
 		char* readptr = tmpstr;
@@ -69,6 +74,9 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 			readptr++;
 		}while(*readptr != '/' && *readptr != '\0');
 		*writeptr = '\0';
+
+		//get file extension
+		*file_ext = strrchr(*archivename, '.');
 
 		//there is a path inside the tarfile
 		if(*readptr != '\0') {
@@ -94,7 +102,7 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 	free(tmpstr);
 }
 
-// TODO: 
+
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
 {	
@@ -123,14 +131,13 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	char* archivename = NULL;
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char* file_ext = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
-		//TODO
-		if (lstat(".", stbuf) == -1)
-			errornumber = -errno;
+		memcpy(stbuf, &topdir, sizeof(topdir));
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
@@ -160,6 +167,8 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 						if(strcmp(row[1], mod_time) != 0) {
 							errornumber = -ENOENT;
 						}
+						//set to appear as directory
+						stbuf->st_mode = topdir.st_mode; //directory w/ usual permissions
 					}
 				}
 				mysql_free_result(result);
@@ -168,8 +177,61 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	}
 	// path is /TarArchive.tar/more
 	else {
-		//TODO
-		errornumber = -EACCES;
+		/* Seperate mysql queries for different filetypes */
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			sprintf(insQuery, "SELECT MemberLength, DirFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			sprintf(insQuery, "SELECT MemberLength, DirFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			sprintf(insQuery, "SELECT MemberLength, DirFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error send query and use result
+		if(errornumber == 0) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = -EACCES;
+				}
+				else {
+					if(mysql_num_rows(result) == 0) {
+						//file does not exist, set not found error
+						errornumber = -ENOENT;
+					}
+					else {
+						MYSQL_ROW row = mysql_fetch_row(result);
+						memcpy(stbuf, &topdir, sizeof(topdir));
+						//stbuf->st_dev = same as topdir
+						stbuf->st_ino = 999; //big useless number
+						if(strcmp(row[1], "N") == 0) {
+							stbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP; //user and group has read permission of regular file
+						}
+						stbuf->st_nlink = 0;
+						//stbuf->st_uid = same as topdir
+						//stbuf->st_gid = same as topdir
+						//stbuf->st_rdev = same as topdir
+						stbuf->st_size = 0 + strtoll(row[0], NULL, 10);
+						//stbuf->st_blksize = same as topdir
+						stbuf->st_blocks = 0; //just set blocks to 0
+						//access, modification, and stat times come from topdir
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -179,10 +241,10 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 
 	return errornumber;
 }
-//TODO: 
+
 // if the file does not exist in the database return (-1 * ENOENT)
-// else if (mask == F_OK || mask == R_OK) return 0
-// else return (-1 * EACCES);
+// else if the file is a directory check for mask containing W_OK flag
+// else only F_OK or R_OK masks allowed
 static int tar_access(const char *path, int mask)
 {
 	int errornumber = 0;
@@ -203,12 +265,20 @@ static int tar_access(const char *path, int mask)
 	char* archivename = NULL;
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char* file_ext = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
 
 	// path is "/"
 	if(archivename == NULL) {
-		errornumber = 0;
+		//directory, only thing not allowed is write
+		if(mask == (W_OK | X_OK | R_OK) ||
+			mask == (W_OK | X_OK) ||
+			mask == (W_OK | R_OK) ||
+			mask == W_OK) {
+			
+			errornumber = -EACCES;
+		}
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
@@ -239,6 +309,14 @@ static int tar_access(const char *path, int mask)
 						if(strcmp(row[1], mod_time) != 0) {
 							errornumber = -ENOENT;
 						}
+						//check mask directory, only thing not allowed is write
+						else if(mask == (W_OK | X_OK | R_OK) ||
+							mask == (W_OK | X_OK) ||
+							mask == (W_OK | R_OK) ||
+							mask == W_OK) {
+							
+							errornumber = -EACCES;
+						}
 						else errornumber = 0;
 					}
 				}
@@ -248,7 +326,63 @@ static int tar_access(const char *path, int mask)
 	}
 	// path is /TarArchive.tar/more
 	else {
-		errornumber = -EACCES;
+		/* Seperate mysql queries for different filetypes */
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error send query and use result
+		if(errornumber == 0) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = -ENOENT;
+				}
+				else {
+					if(mysql_num_rows(result) == 0) {
+						//file does not exist, set not found error
+						errornumber = -ENOENT;
+					}
+					else {
+						MYSQL_ROW row = mysql_fetch_row(result);
+						if(strcmp(row[0], "Y") == 0) {
+							//directory, only thing not allowed is write
+							if(mask == (W_OK | X_OK | R_OK) ||
+								mask == (W_OK | X_OK) ||
+								mask == (W_OK | R_OK) ||
+								mask == W_OK) {
+								
+								errornumber = -EACCES;
+							}
+						}
+						else {
+							//file, only reading allowed
+							if(mask != F_OK && mask != R_OK) {
+								errornumber = -EACCES;
+							}
+						}
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -258,9 +392,8 @@ static int tar_access(const char *path, int mask)
 
 	return errornumber;
 }
-//TODO:
-// perform operation of man readlink(2) 
-// http://linux.die.net/man/2/readlink 
+
+//we detect links and resolve them in the read function
 static int tar_readlink(const char *path, char *buf, size_t size)
 {
 	//original code
@@ -273,50 +406,10 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	return 0;
 	*/
 
-	int errornumber = 0;
-
-	// connect to database, begin a transaction
-	MYSQL *con = mysql_init(NULL);
-	//read options from file
-	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
-	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
-
-	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
-		//exit, connection failed
-		mysql_close(con);
-		errornumber = -EACCES;
-		return errornumber;
-	}
-
-	char* archivename = NULL;
-	char* within_tar_path = NULL;
-	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
-	char insQuery[1000];
-
-	// path is "/"
-	if(archivename == NULL) {
-		errornumber = -EINVAL;
-	}
-	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
-	else if(within_tar_path == NULL) {
-		errornumber = -EINVAL;
-	}
-	// path is /TarArchive.tar/more
-	else {
-		//TODO
-		errornumber = -EINVAL;
-	}
-	//free possible mallocs and mysql connection
-	mysql_close(con);
-	if(archivename != NULL) free(archivename);
-	if(within_tar_path != NULL) free(within_tar_path);
-	if(within_tar_filename != NULL) free(within_tar_filename);
-
-	return errornumber;
+	return -EACCES;
 }
 
-//TODO research more
+
 // -extra slashes are omitted (ex. "/home/" becomes "/home"
 static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	off_t offset, struct fuse_file_info *fi)
@@ -364,7 +457,8 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	char* archivename = NULL;
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char* file_ext = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
 
 	// path is "/"
@@ -393,7 +487,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 						memset(&st, 0, sizeof(st));
 						if(lstat(row[1], &st) == 0) {
 							//redefine as directory and pass to filler
-							st.st_mode = 16877; //directory w/ usual permissions;
+							st.st_mode = topdir.st_mode; //directory w/ usual permissions;
 							//check timestamp
 							char* mod_time = ctime(&(st.st_mtime));
 							if(strcmp(row[2], mod_time) == 0) {
@@ -408,13 +502,131 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
-		errornumber = -EACCES;
+		/* Seperate mysql queries for different filetypes */
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error send query and use result
+		if(errornumber == 0) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = 0;
+				}
+				else {
+					if(mysql_num_rows(result) == 0) {
+						//no results
+						errornumber = 0;
+					}
+					else {
+						//while there are rows to be fetched
+						MYSQL_ROW row;
+						while((row = mysql_fetch_row(result))) {
+							//get the real stats of the file
+							struct stat st;
+							memcpy(&st, &topdir, sizeof(topdir));
+							//st->st_dev = same as topdir
+							st.st_ino = 999; //big useless number
+							if(strcmp(row[0], "N") == 0) {
+								st.st_mode = S_IFREG | S_IRUSR | S_IRGRP; //user and group has read permission of regular file
+							}
+							st.st_nlink = 0;
+							//st.st_uid = same as topdir
+							//st.st_gid = same as topdir
+							//st.st_rdev = same as topdir
+							st.st_size = 0 + strtoll(row[1], NULL, 10);
+							//st->st_blksize = same as topdir
+							st.st_blocks = 0; //just set blocks to 0
+							//access, modification, and stat times come from topdir
+							if (filler(buf, row[2], &st, 0)) break;
+						}
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
 	}
 	// path is /TarArchive.tar/more
 	else {
-		//TODO
-		errornumber = -EACCES;
+		/* Seperate mysql queries for different filetypes */
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error send query and use result
+		if(errornumber == 0) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = 0;
+				}
+				else {
+					if(mysql_num_rows(result) == 0) {
+						//no results
+						errornumber = 0;
+					}
+					else {
+						//while there are rows to be fetched
+						MYSQL_ROW row;
+						while((row = mysql_fetch_row(result))) {
+							//get the real stats of the file
+							struct stat st;
+							memcpy(&st, &topdir, sizeof(topdir));
+							//st.st_dev = same as topdir
+							st.st_ino = 999; //big useless number
+							if(strcmp(row[0], "N") == 0) {
+								st.st_mode = S_IFREG | S_IRUSR | S_IRGRP; //user and group has read permission of regular file
+							}
+							st.st_nlink = 0;
+							//st.st_uid = same as topdir
+							//st.st_gid = same as topdir
+							//st.st_rdev = same as topdir
+							st.st_size = 0 + strtoll(row[1], NULL, 10);
+							//st.st_blksize = same as topdir
+							st.st_blocks = 0; //just set blocks to 0
+							//access, modification, and stat times come from topdir
+							if (filler(buf, row[2], &st, 0)) break;
+						}
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
@@ -565,7 +777,8 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 	char* archivename = NULL;
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char* file_ext = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
 
 	// path is "/"
@@ -628,7 +841,8 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	char* archivename = NULL;
 	char* within_tar_path = NULL;
 	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
+	char* file_ext = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
 
 	// path is "/"
@@ -664,7 +878,8 @@ static int tar_write(const char *path, const char *buf, size_t size,
 	return (-1 * EACCES); //write permission not allowed
 }
 
-// TODO: Mimic statvfs(2), http://linux.die.net/man/2/statvfs 
+// returns information about a mounted file system path
+// --we don't allow mounted filesystems within the our FUSE
 static int tar_statfs(const char *path, struct statvfs *stbuf)
 {
 	// original code
@@ -675,74 +890,8 @@ static int tar_statfs(const char *path, struct statvfs *stbuf)
 		return -errno;
 	return 0;
 	*/
-	
-	int errornumber = 0;
 
-	// connect to database, begin a transaction
-	MYSQL *con = mysql_init(NULL);
-	//read options from file
-	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
-	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
-
-	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
-		//exit, connection failed
-		mysql_close(con);
-		errornumber = -EACCES;
-		return errornumber;
-	}
-
-	char* archivename = NULL;
-	char* within_tar_path = NULL;
-	char* within_tar_filename = NULL;
-	parsepath(path, &archivename, &within_tar_path, &within_tar_filename);
-	char insQuery[1000];
-
-	// path is "/"
-	if(archivename == NULL) {
-		//TODO
-		if (statvfs(".", stbuf) == -1)
-			errornumber = -errno;
-	}
-	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
-	else if(within_tar_path == NULL) {
-		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
-		if(mysql_query(con, insQuery)) {
-			//query error
-			errornumber = -ENOENT;
-		}
-		else {
-			MYSQL_RES* result = mysql_store_result(con);
-			if(result == NULL) {
-				errornumber = -EACCES;
-			}
-			else {
-				if(mysql_num_rows(result) == 0) {
-					//file does not exist, set not found error
-					errornumber = -ENOENT;
-				}
-				else {
-					MYSQL_ROW row = mysql_fetch_row(result);
-					if(statvfs(row[0], stbuf) == -1) {
-						errornumber = -errno;
-					}
-					//no timestamp in this stbuf
-				}
-				mysql_free_result(result);
-			}
-		}
-	}
-	// path is /TarArchive.tar/more
-	else {
-		//TODO
-		errornumber = -EACCES;
-	}
-	//free possible mallocs and mysql connection
-	mysql_close(con);
-	if(archivename != NULL) free(archivename);
-	if(within_tar_path != NULL) free(within_tar_path);
-	if(within_tar_filename != NULL) free(within_tar_filename);
-
-	return errornumber;
+	return -EACCES;
 }
 
 // weird not allowed file altering
@@ -786,7 +935,12 @@ static struct fuse_operations tar_oper = {
 
 
 int main(int argc, char *argv[])
-{
+{	if(argc > 1) {
+		if (lstat(argv[1], &topdir) == -1) {
+			printf("unable to lstat %s\n", argv[1]);
+			return -1;
+		}
+	}
 	umask(0);
 	return fuse_main(argc, argv, &tar_oper, NULL);
 }
