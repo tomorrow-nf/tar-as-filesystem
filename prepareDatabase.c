@@ -28,11 +28,11 @@ int main() {
 	int archivetable_exists = 0;
 
 	char* basetar = "UncompTar";
-	char* createbasetar = "CREATE TABLE UncompTar (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), DirFlag CHAR(1), PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
+	char* createbasetar = "CREATE TABLE UncompTar (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), GBoffset INT, BYTEoffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), DirFlag CHAR(1), Mode INT, Uid INT, Gid INT, PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int basetar_exists = 0;
 
 	char* bzip2_files = "Bzip2_files";
-	char* create_bzip2_files = "CREATE TABLE Bzip2_files (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), DirFlag CHAR(1), PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
+	char* create_bzip2_files = "CREATE TABLE Bzip2_files (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), DirFlag CHAR(1), Mode INT, Uid INT, Gid INT, PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int bzip2_files_exists = 0;
 
 	char* bzip2_blocks = "Bzip2_blocks";
@@ -40,7 +40,7 @@ int main() {
 	int bzip2_blocks_exists = 0;
 
 	char* compxz = "CompXZ";
-	char* createcompxz = "CREATE TABLE CompXZ (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), DirFlag CHAR(1), PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
+	char* createcompxz = "CREATE TABLE CompXZ (FileID INT AUTO_INCREMENT, ArchiveID INT, ArchiveName VARCHAR(255), MemberName VARCHAR(300), MemberPath VARCHAR(5000), Blocknumber INT, BlockOffset BIGINT, InsideOffset BIGINT, MemberLength VARCHAR(12), LinkFlag CHAR(1), DirFlag CHAR(1), Mode INT, Uid INT, Gid INT, PRIMARY KEY (FileID), FOREIGN KEY(ArchiveID) REFERENCES ArchiveList(ArchiveID)) ENGINE=InnoDB";
 	int compxz_exists = 0;
 
 	char* compxz_blocks = "CompXZ_blocks";

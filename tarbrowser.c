@@ -182,15 +182,15 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT MemberLength, DirFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT MemberLength, DirFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT MemberLength, DirFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
@@ -216,12 +216,15 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 						memcpy(stbuf, &topdir, sizeof(topdir));
 						//stbuf->st_dev = same as topdir
 						stbuf->st_ino = 999; //big useless number
-						if(strcmp(row[1], "N") == 0) {
-							stbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP; //user and group has read permission of regular file
+						if(strcmp(row[4], "N") == 0) {
+							stbuf->st_mode = 0 + strtol(row[1], NULL, 10) + S_IFREG;
+						}
+						else {
+							stbuf->st_mode = 0 + strtol(row[1], NULL, 10) + S_IFDIR;
 						}
 						stbuf->st_nlink = 0;
-						//stbuf->st_uid = same as topdir
-						//stbuf->st_gid = same as topdir
+						stbuf->st_uid = 0 + strtol(row[2], NULL, 10);
+						stbuf->st_gid = 0 + strtol(row[3], NULL, 10);
 						//stbuf->st_rdev = same as topdir
 						stbuf->st_size = 0 + strtoll(row[0], NULL, 10);
 						//stbuf->st_blksize = same as topdir
@@ -507,15 +510,15 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
@@ -546,11 +549,14 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 							//st->st_dev = same as topdir
 							st.st_ino = 999; //big useless number
 							if(strcmp(row[0], "N") == 0) {
-								st.st_mode = S_IFREG | S_IRUSR | S_IRGRP; //user and group has read permission of regular file
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
+							}
+							else {
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
 							}
 							st.st_nlink = 0;
-							//st.st_uid = same as topdir
-							//st.st_gid = same as topdir
+							st.st_uid = 0 + strtoll(row[4], NULL, 10);
+							st.st_gid = 0 + strtoll(row[5], NULL, 10);
 							//st.st_rdev = same as topdir
 							st.st_size = 0 + strtoll(row[1], NULL, 10);
 							//st->st_blksize = same as topdir
@@ -571,15 +577,15 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
@@ -609,12 +615,10 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 							memcpy(&st, &topdir, sizeof(topdir));
 							//st.st_dev = same as topdir
 							st.st_ino = 999; //big useless number
-							if(strcmp(row[0], "N") == 0) {
-								st.st_mode = S_IFREG | S_IRUSR | S_IRGRP; //user and group has read permission of regular file
-							}
+							st.st_mode = 0 + strtoll(row[3], NULL, 10);
 							st.st_nlink = 0;
-							//st.st_uid = same as topdir
-							//st.st_gid = same as topdir
+							st.st_uid = 0 + strtoll(row[4], NULL, 10);
+							st.st_gid = 0 + strtoll(row[5], NULL, 10);
 							//st.st_rdev = same as topdir
 							st.st_size = 0 + strtoll(row[1], NULL, 10);
 							//st.st_blksize = same as topdir
