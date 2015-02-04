@@ -787,18 +787,105 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 
 	// path is "/"
 	if(archivename == NULL) {
-		//TODO
 		errornumber = -EACCES;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
-		errornumber = -EACCES;
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		if(mysql_query(con, insQuery)) {
+			//query error
+			errornumber = -ENOENT;
+		}
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(result == NULL) {
+				errornumber = -EACCES;
+			}
+			else {
+				if(mysql_num_rows(result) == 0) {
+					//file does not exist, set not found error
+					errornumber = -ENOENT;
+				}
+				else {
+					MYSQL_ROW row = mysql_fetch_row(result);
+					struct stat statbuff;
+					if(lstat(row[0], &statbuff) == -1) {
+						errornumber = -errno;
+					}
+					//check timestamp
+					else {
+						char* mod_time = ctime(&(statbuff.st_mtime));
+						if(strcmp(row[1], mod_time) != 0) {
+							errornumber = -ENOENT;
+						}
+						//check fi->flags for read only
+						else if(fi->flags != O_RDONLY) {
+							errornumber = -EACCES;
+						}
+						else errornumber = 0;
+					}
+				}
+				mysql_free_result(result);
+			}
+		}
 	}
 	// path is /TarArchive.tar/more
 	else {
-		//TODO
-		errornumber = -EACCES;
+		/* Seperate mysql queries for different filetypes */
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, FileID from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, FileID from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			sprintf(insQuery, "SELECT DirFlag, FileID from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error send query and use result
+		if(errornumber == 0) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = -ENOENT;
+				}
+				else {
+					if(mysql_num_rows(result) == 0) {
+						//file does not exist, set not found error
+						errornumber = -ENOENT;
+					}
+					else {
+						MYSQL_ROW row = mysql_fetch_row(result);
+						if(strcmp(row[0], "Y") == 0) {
+							//directory, not allowed to open
+							errornumber = -EACCES;
+						}
+						else {
+							//file, only reading allowed
+							if(fi->flags != O_RDONLY) {
+								errornumber = -EACCES;
+							}
+							//set file handle to ID
+							else {
+								fi->fh = 0 + strtoll(row[1], NULL, 10);
+							}
+						}
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
