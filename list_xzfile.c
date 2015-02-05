@@ -69,8 +69,8 @@ void* grab_block(int blocknum, char* filename) {
 	uint8_t* out_buf = (uint8_t*) malloc(iter.block.uncompressed_size);
 	uint8_t buf[LZMA_BLOCK_HEADER_SIZE_MAX];
 
-	printf("DEBUG: in_buf (iter.block.total_size) size = %llu\n", iter.block.total_size);
-	printf("DEBUG: out_buf size = %llu\n", iter.block.uncompressed_size);
+	//printf("DEBUG: in_buf (iter.block.total_size) size = %llu\n", iter.block.total_size);
+	//printf("DEBUG: out_buf size = %llu\n", iter.block.uncompressed_size);
 
 	lseek(pair->src_fd, iter.block.compressed_file_offset, SEEK_SET);
 	read(pair->src_fd, in_buf, iter.block.total_size);
