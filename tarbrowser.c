@@ -791,7 +791,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp, ArchiveID from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
 			errornumber = -ENOENT;
@@ -822,7 +822,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 						else if(fi->flags != O_RDONLY) {
 							errornumber = -EACCES;
 						}
-						else errornumber = 0;
+						else fi->fh = 0 + strtoll(row[2], NULL, 10);
 					}
 				}
 				mysql_free_result(result);
