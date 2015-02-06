@@ -747,7 +747,7 @@ static int tar_utimens(const char *path, const struct timespec ts[2])
 }
 #endif
 
-//TODO
+
 // if file exists:
 //   if fi->flags != RD_ONLY return (-1 * EACCES);
 //   else return 0;
@@ -938,13 +938,53 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 
 	// path is "/"
 	if(archivename == NULL) {
-		//TODO
 		errornumber = -EACCES;
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		//TODO
-		errornumber = -EACCES;
+		long long int archiveid = 0 + fi->fd; //get archive id from file_info
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveID = %lld", archiveid);
+		if(mysql_query(con, insQuery)) {
+			//query error
+			errornumber = -ENOENT;
+		}
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(result == NULL) {
+				errornumber = -ENOENT;
+			}
+			else {
+				if(mysql_num_rows(result) == 0) {
+					//file does not exist, set not found error
+					errornumber = -ENOENT;
+				}
+				else {
+					MYSQL_ROW row = mysql_fetch_row(result);
+					struct stat statbuff;
+					if(lstat(row[0], &statbuff) == -1) {
+						errornumber = -errno;
+					}
+					//check timestamp
+					else {
+						char* mod_time = ctime(&(statbuff.st_mtime));
+						if(strcmp(row[1], mod_time) != 0) {
+							errornumber = -ENOENT;
+						}
+						// open and read file
+						else {
+							int fi_des = open(path, O_RDONLY);
+							if (fi_des == -1)
+								errornumber = -errno;
+							else {
+								if (pread(fi_des, buf, size, offset) == -1) res = -errno;
+								close(fd);
+							}
+						}
+					}
+				}
+				mysql_free_result(result);
+			}
+		}
 	}
 	// path is /TarArchive.tar/more
 	else {
