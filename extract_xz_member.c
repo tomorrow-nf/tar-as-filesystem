@@ -11,15 +11,34 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "common_functions.h"
-#include "bzip_seek/bitmapstructs.h"
 #include "sqloptions.h"
 
 /*
+	Get the "blocknum" block in the xz file "filename", move foward "offset" bytes,
+	copy bytes into "outbuf" until "size" bytes have been copied
+
+	Requires that outbuf is already allocated to "size"
+*/
+char* getmember_xz(char* filename, int blocknum, long long int offset, long long int size, char* outbuf) {
+	
+	// Grab a block and append it to the buffer. Repeat until the entire member is copied into the buffer
+	for (int i = 0, sizeof(outbuf) < size, i++){
+		if (i = 0){
+			outbuf = outbuf + offset; // Increment by the offset on first pass
+		}
+		outbuf = strcat(outbuf, grab_block(blocknum, filename));
+		blocknum++;
+		getmember_xz(filename, blocknum, outbuf, size);
+	}
+	return outbuf;
+}
+
+/*
  	Query the TAR Browser database, use this info to extract the desired member from
- 	the given BZip2 archive
+ 	the given XZ archive
 */
 
-int extract_bzip2_member(MYSQL *con, char* filename, char* fullpath, char* membername) {
+int extract_xz_member(MYSQL *con, char* filename, char* fullpath, char* membername) {
 
 	char* destination = "/tmp/";
 
@@ -28,7 +47,7 @@ int extract_bzip2_member(MYSQL *con, char* filename, char* fullpath, char* membe
 
 	// Member info to be queried from the database
 	//unsigned long long block_offset;
-	long int block_offset;
+	int blocknum
 	long int offset;
 	long long int size;
 
@@ -54,15 +73,14 @@ int extract_bzip2_member(MYSQL *con, char* filename, char* fullpath, char* membe
 	}
 		
 	row = mysql_fetch_row(result);
-			
-	// Save the queried data
-	block_offset = atoi(row[6]);
-	inside_offset = strtol(row[7], NULL, 10);
+	
+	// Save the queried data		
+	blocknum = atoi(row[5]);
+	offset = strtol(row[7], NULL, 10);
 	size = strtoll(row[8], NULL, 8);
-
+			
 	mysql_free_result(result);
 			
-
 	// File operations
 	int tarfile = open(fullpath, O_RDONLY);
 	if(tarfile < 0) {
@@ -78,11 +96,13 @@ int extract_bzip2_member(MYSQL *con, char* filename, char* fullpath, char* membe
 		free(output);
 		return 1;
 	}
-		
+
 	// Extract the member
-	//pass the information & file handles to the function that decompresses, seeks, & writes
-	int uncomperror = uncompressfile( tarfile, memberfile, block_offset, inside_offset, size );
-	if(uncomperror) {
+	char* output_data = (char*) malloc(size);
+	output_data = getmember_xz(filename, memberfile, blocknum, offset, size, output_data);
+
+	// Write the output data into a file
+	if (fwrite(output_data, sizeof(output_data), 1, memberfile) == 0){
 		printf("There was an error extracting the file\n");
 		free(output);
 		close(tarfile);
@@ -92,6 +112,7 @@ int extract_bzip2_member(MYSQL *con, char* filename, char* fullpath, char* membe
 
 	//close files and finish
 	free(output);
+	free(output_data);
 	close(tarfile);
 	close(memberfile);
 	return 0;
