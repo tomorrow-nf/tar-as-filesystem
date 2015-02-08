@@ -224,7 +224,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 						memcpy(stbuf, &topdir, sizeof(topdir));
 						//stbuf->st_dev = same as topdir
 						stbuf->st_ino = 999; //big useless number
-						if(strncmp(row[5], "1") == 0, strncmp(row[5], "2") == 0) {
+						if(strncmp(row[5], "1", 1) == 0, strncmp(row[5], "2", 1) == 0) {
 							stbuf->st_mode = 0 + strtol(row[1], NULL, 10) + S_IFLNK;
 						}
 						else if(strcmp(row[4], "N") == 0) {
