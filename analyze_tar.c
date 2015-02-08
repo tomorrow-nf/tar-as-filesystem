@@ -227,11 +227,17 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				file_length = strtoll(header.size, NULL, 8);
 				printf("member's data length (int): %lld\n", file_length);
 
-				//get linked filename (if name was not long)
+				//get filename (if name was not long)
 				if(!the_name_is_long) {
 					strncpy(membername, header.name, 100);
 					membername[100] = '\0'; //force null terminated string
 				}
+
+				//get linked filename (if flag set, otherwise this field is useless)
+				if(!the_link_is_long) {
+					strncpy(linkname, header.linkname, 100);
+				}
+				printf("link name: %s\n", linkname);
 
 				//convert to a name and directory path
 				char membername_path[5000];
@@ -277,7 +283,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, '%s', '%c', '%c', %ld, %ld, %ld)", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, header.size, header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8));
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, '%s', '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, header.size, header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 					printf("%s\n", insQuery);

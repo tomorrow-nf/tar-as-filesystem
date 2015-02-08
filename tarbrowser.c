@@ -102,6 +102,14 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 	free(tmpstr);
 }
 
+/*
+	Get the block "blocknum" in the xz file "filename" move foward "offset" bytes,
+	copy bytes into "buf" until "size" bytes have been copied
+*/
+void* getblock_xz(char* filename, int blocknum, char* buf, long long int offset, long long int size) {
+
+	
+}
 
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
@@ -182,15 +190,15 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag, LinkFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag, LinkFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT MemberLength, Mode, Uid, Gid, Dirflag, LinkFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
@@ -216,7 +224,10 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 						memcpy(stbuf, &topdir, sizeof(topdir));
 						//stbuf->st_dev = same as topdir
 						stbuf->st_ino = 999; //big useless number
-						if(strcmp(row[4], "N") == 0) {
+						if(strncmp(row[5], "1") == 0, strncmp(row[5], "2") == 0) {
+							stbuf->st_mode = 0 + strtol(row[1], NULL, 10) + S_IFLNK;
+						}
+						else if(strcmp(row[4], "N") == 0) {
 							stbuf->st_mode = 0 + strtol(row[1], NULL, 10) + S_IFREG;
 						}
 						else {
@@ -396,7 +407,8 @@ static int tar_access(const char *path, int mask)
 	return errornumber;
 }
 
-//we detect links and resolve them in the read function
+//TODO
+//takes a symbolic link and puts its referenced path in buf
 static int tar_readlink(const char *path, char *buf, size_t size)
 {
 	//original code
@@ -409,7 +421,99 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	return 0;
 	*/
 
-	return -EACCES;
+	int errornumber = 0;
+
+	// connect to database, begin a transaction
+	MYSQL *con = mysql_init(NULL);
+	//read options from file
+	mysql_options(con, MYSQL_READ_DEFAULT_FILE, SQLCONFILE); //SQLCONFILE defined in sqloptions.h
+	mysql_options(con, MYSQL_READ_DEFAULT_GROUP, SQLGROUP);
+
+	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
+		//exit, connection failed
+		mysql_close(con);
+		errornumber = -EACCES;
+		return errornumber;
+	}
+
+	char* archivename = NULL;
+	char* within_tar_path = NULL;
+	char* within_tar_filename = NULL;
+	char* file_ext = NULL;
+	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
+	char insQuery[1000];
+
+	// path is "/"
+	if(archivename == NULL) {
+		errornumber = -EINVAL;
+	}
+	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
+	else if(within_tar_path == NULL) {
+		errornumber = -EINVAL;
+	}
+	// path is /TarArchive.tar/more
+	else {
+		/* Seperate mysql queries for different filetypes */
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			sprintf(insQuery, "SELECT LinkFlag, LinkTarget from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			sprintf(insQuery, "SELECT LinkFlag, LinkTarget from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			sprintf(insQuery, "SELECT LinkFlag, LinkTarget from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s' AND MemberName = '%s'", archivename, within_tar_path, within_tar_filename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error send query and use result
+		if(errornumber == 0) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = -EACCES;
+				}
+				else {
+					if(mysql_num_rows(result) == 0) {
+						//file does not exist, set not found error
+						errornumber = -ENOENT;
+					}
+					else {
+						MYSQL_ROW row = mysql_fetch_row(result);
+						//check if its a hardlink "1" or softlink "2"
+						if(strncmp(row[0], "2") == 0) {
+							strncpy(buf, row[1], (size-1));
+							buf[(size-1)] = '\0';
+						}
+						else if(strncmp(row[0], "1") == 0) {
+							char linkstring[5000];
+							sprintf(linkstring, "/%s/%s", archivename, row[1])
+						}
+						else {
+							errornumber = -EINVAL;
+						}
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
+	}
+	//free possible mallocs and mysql connection
+	mysql_close(con);
+	if(archivename != NULL) free(archivename);
+	if(within_tar_path != NULL) free(within_tar_path);
+	if(within_tar_filename != NULL) free(within_tar_filename);
+
+	return errornumber;
 }
 
 
@@ -510,15 +614,15 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '/'", archivename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
@@ -548,11 +652,14 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 							memcpy(&st, &topdir, sizeof(topdir));
 							//st->st_dev = same as topdir
 							st.st_ino = 999; //big useless number
-							if(strcmp(row[0], "N") == 0) {
-								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
+							if(strncmp(row[6], "1") == 0, strncmp(row[6], "2") == 0) {
+								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFLNK;
+							}
+							else if(strcmp(row[0], "N") == 0) {
+								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
 							}
 							else {
-								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
+								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
 							}
 							st.st_nlink = 0;
 							st.st_uid = 0 + strtoll(row[4], NULL, 10);
@@ -577,15 +684,15 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
@@ -615,7 +722,15 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 							memcpy(&st, &topdir, sizeof(topdir));
 							//st.st_dev = same as topdir
 							st.st_ino = 999; //big useless number
-							st.st_mode = 0 + strtoll(row[3], NULL, 10);
+							if(strncmp(row[6], "1") == 0, strncmp(row[6], "2") == 0) {
+								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFLNK;
+							}
+							else if(strcmp(row[0], "N") == 0) {
+								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
+							}
+							else {
+								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
+							}
 							st.st_nlink = 0;
 							st.st_uid = 0 + strtoll(row[4], NULL, 10);
 							st.st_gid = 0 + strtoll(row[5], NULL, 10);
