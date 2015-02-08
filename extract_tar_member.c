@@ -105,7 +105,6 @@ int extract_tar_member(MYSQL *con, char* filename, char* fullpath, char* membern
 	free(output);
 	fclose(tarfile);
 	fclose(member);
-	mysql_close(con);
 	return 0;
 }
 
