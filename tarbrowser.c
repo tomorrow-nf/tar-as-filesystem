@@ -29,6 +29,8 @@
 TAR-Browser: File system in userspace to examine the contents
 of a TAR archive
 
+This file primarily handles FUSE operations
+
 Initial release supports uncompressed TAR archives, 
 tar.xz archives, and tar.bz2 archives
 
@@ -102,14 +104,6 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 	free(tmpstr);
 }
 
-/*
-	Get the block "blocknum" in the xz file "filename" move foward "offset" bytes,
-	copy bytes into "buf" until "size" bytes have been copied
-*/
-void* getblock_xz(char* filename, int blocknum, char* buf, long long int offset, long long int size) {
-
-	
-}
 
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
