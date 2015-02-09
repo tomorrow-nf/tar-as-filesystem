@@ -24,6 +24,7 @@
 #include <sys/xattr.h>
 #endif
 #include "sqloptions.h"
+#include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
 //#include "common_functions.h"
 //#include "xzfuncs.h"
 
@@ -1102,6 +1103,9 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	char* file_ext = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
+	struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
+	block_offsets->blocklocations = NULL;
+	
 
 	// path is "/"
 	if(archivename == NULL) {
@@ -1155,7 +1159,59 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	}
 	// path is /TarArchive.tar/more
 	else {
-		//TODO
+		/* Load Blockmap ******************************************************/
+		int needBlockmap = 0;
+		//no file extension
+		if(file_ext == NULL) errornumber = -ENOENT;
+		//.tar
+		else if(strcmp(".tar", file_ext) == 0) {
+			needBlockmap = 0;
+		}
+		//.bz2 //TODO add other forms of bz2 extention
+		else if(strcmp(".bz2", file_ext) == 0) {
+			needBlockmap = 1;
+			sprintf(insQuery, "SELECT Blocknumber, BlockOffset, BlockSize from Bzip2_blocks WHERE ArchiveName = '%s'", archivename);
+		}
+		//.xz or .txz
+		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+			needBlockmap = 1;
+			sprintf(insQuery, "SELECT Blocknumber, BlockOffset, BlockSize from CompXZ_blocks WHERE ArchiveName = '%s'", archivename);
+		}
+		//unrecognized file extension
+		else errornumber = -ENOENT;
+
+		//if no error and we need a blockmap send query and use result
+		if(errornumber == 0 && needBlockmap == 1) {
+			if(mysql_query(con, insQuery)) {
+				//query error
+				errornumber = -ENOENT;
+			}
+			else {
+				MYSQL_RES* result = mysql_store_result(con);
+				if(result == NULL) {
+					errornumber = 0;
+				}
+				else {
+					int number_of_results = mysql_num_rows(result);
+					if(number_of_results == 0) {
+						//no results
+						errornumber = -ENOENT;
+					}
+					else {
+						//while there are rows to be fetched
+						block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * (number_of_results + 1));
+						block_offsets->maxsize = (number_of_results + 1);
+						MYSQL_ROW row;
+						while((row = mysql_fetch_row(result))) {
+							//TODO fill blockmap
+						}
+					}
+					mysql_free_result(result);
+				}
+			}
+		}
+
+		//TODO continue read
 		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
@@ -1163,6 +1219,8 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	if(archivename != NULL) free(archivename);
 	if(within_tar_path != NULL) free(within_tar_path);
 	if(within_tar_filename != NULL) free(within_tar_filename);
+	if(block_offsets->blocklocations != NULL) free(block_offsets->blocklocations);
+	if(block_offsets != NULL) free(block_offsets);
 
 	return errornumber;
 }
