@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "common_functions.h"
+#include "xzfuncs.h"
 #include "sqloptions.h"
 
 /*
@@ -19,8 +20,39 @@
 
 	Requires that outbuf is already allocated to "size"
 */
-char* getmember_xz(char* filename, int blocknum, long long int offset, long long int size, char* outbuf) {
+char* getmember_xz(char* filename, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
+
+	long long int bytes_to_read = size;
+	char* block = grab_block(blocknum, filename);
+	char* location = block;
+	location = location + offset;
+	int current_blocknum = blocknum;
+
+	if(block == NULL) {
+		return 0; //TODO ERRNO
+	}
 	
+	long long int dataremaining_in_block = ((offsets->blocklocations)[current_blocknum]).uncompressedSize - offset;
+	
+	int done = 1;
+	while(done) {
+		if(dataremaining_in_block > bytes_to_read)
+			memcpy(outbuf, location, bytes_to_read);
+			free(block);
+			break;
+		else {
+			memcpy(outbuf, location, dataremaining_in_block);
+			bytes_to_read = bytes_to_read - dataremaining_in_block;
+			location = location + dataremaining_in_block;
+			free(block);
+			current_blocknum++;
+			block = grab_block(current_blocknum, filename);
+			if(block == NULL) return 0; //TODO ERRNO
+			dataremaining_in_block = ((offsets->blocklocations)[current_blocknum]).uncompressedSize;
+		}
+	}
+
+	/*
 	// Grab a block and append it to the buffer. Repeat until the entire member is copied into the buffer
 	for (int i = 0, sizeof(outbuf) < size, i++){
 		if (i = 0){
@@ -30,7 +62,7 @@ char* getmember_xz(char* filename, int blocknum, long long int offset, long long
 		blocknum++;
 		getmember_xz(filename, blocknum, outbuf, size);
 	}
-	return outbuf;
+	return outbuf;*/
 }
 
 /*

@@ -3,7 +3,7 @@ all: directories tarbrowser analyze_archive prepareDatabase
 directories: 
 	mkdir -p build
 
-tarbrowser:
+tarbrowser: list_xzfile.c list_xzfile.h
 	gcc -Wall tarbrowser.c `pkg-config fuse --cflags --libs` `mysql_config --cflags --libs` -o build/tarbrowser
 
 analyze_archive: list_xzfile.o bzip2map analyze_archive.o analyze_tar.o analyze_bz2.o analyze_xz.o common_functions.o

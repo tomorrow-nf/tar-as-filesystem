@@ -24,6 +24,8 @@
 #include <sys/xattr.h>
 #endif
 #include "sqloptions.h"
+//#include "common_functions.h"
+//#include "xzfuncs.h"
 
 /*
 TAR-Browser: File system in userspace to examine the contents
@@ -104,6 +106,42 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 	free(tmpstr);
 }
 
+/*
+char* readfrom_xz(char* filename, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
+
+	long long int bytes_to_read = size;
+	char* block = grab_block(blocknum, filename);
+	char* location = block;
+	location = location + offset;
+	int current_blocknum = blocknum;
+
+	if(block == NULL) {
+		return -EIO;
+	}
+	
+	long long int dataremaining_in_block = ((offsets->blocklocations)[current_blocknum]).uncompressedSize - offset;
+	
+	int done = 1;
+	while(done) {
+		if(dataremaining_in_block > bytes_to_read)
+			memcpy(outbuf, location, bytes_to_read);
+			free(block);
+			break;
+		else {
+			memcpy(outbuf, location, dataremaining_in_block);
+			bytes_to_read = bytes_to_read - dataremaining_in_block;
+			location = location + dataremaining_in_block;
+			free(block);
+			current_blocknum++;
+			block = grab_block(current_blocknum, filename);
+			if(block == NULL) return -EIO;
+			dataremaining_in_block = ((offsets->blocklocations)[current_blocknum]).uncompressedSize;
+		}
+	}
+
+	return 0;
+}
+*/
 
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
@@ -218,7 +256,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 						memcpy(stbuf, &topdir, sizeof(topdir));
 						//stbuf->st_dev = same as topdir
 						stbuf->st_ino = 999; //big useless number
-						if(strncmp(row[5], "1", 1) == 0, strncmp(row[5], "2", 1) == 0) {
+						if(strncmp(row[5], "1", 1) == 0 || strncmp(row[5], "2", 1) == 0) {
 							stbuf->st_mode = 0 + strtol(row[1], NULL, 10) + S_IFLNK;
 						}
 						else if(strcmp(row[4], "N") == 0) {
@@ -401,7 +439,7 @@ static int tar_access(const char *path, int mask)
 	return errornumber;
 }
 
-//TODO
+
 //takes a symbolic link and puts its referenced path in buf
 static int tar_readlink(const char *path, char *buf, size_t size)
 {
@@ -484,13 +522,26 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 					else {
 						MYSQL_ROW row = mysql_fetch_row(result);
 						//check if its a hardlink "1" or softlink "2"
-						if(strncmp(row[0], "2") == 0) {
+						if(strncmp(row[0], "2", 1) == 0) {
 							strncpy(buf, row[1], (size-1));
 							buf[(size-1)] = '\0';
 						}
-						else if(strncmp(row[0], "1") == 0) {
+						else if(strncmp(row[0], "1", 1) == 0) {
 							char linkstring[5000];
-							sprintf(linkstring, "/%s/%s", archivename, row[1])
+							char converted_linkstring[8000] = "";
+							sprintf(linkstring, "%s/%s", archivename, row[1]);
+							int dots = 0;
+							int i;
+							for(i=0;i<strlen(path);i++) {
+								if(path[i] == '/') dots++;
+							}
+
+							for(i=1;i<dots;i++) {
+								strcat(converted_linkstring, "../");
+							}
+							strcat(converted_linkstring, linkstring);
+							strncpy(buf, converted_linkstring, (size-1));
+							buf[(size-1)] = '\0';
 						}
 						else {
 							errornumber = -EINVAL;
@@ -540,6 +591,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	closedir(dp);
 	return 0; */
 
+	printf("\nDEBUG READDIR: entered - %s\n", path);
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
@@ -603,6 +655,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
+		printf("DEBUG READDIR: readdir on archive.tar\n");
 		/* Seperate mysql queries for different filetypes */
 		//no file extension
 		if(file_ext == NULL) errornumber = -ENOENT;
@@ -623,6 +676,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 		//if no error send query and use result
 		if(errornumber == 0) {
+			printf("DEBUG READDIR: sending query %s\n", insQuery);
 			if(mysql_query(con, insQuery)) {
 				//query error
 				errornumber = -ENOENT;
@@ -634,6 +688,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
+						printf("DEBUG READDIR: NO RESULTS\n");
 						//no results
 						errornumber = 0;
 					}
@@ -644,16 +699,16 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 							//get the real stats of the file
 							struct stat st;
 							memcpy(&st, &topdir, sizeof(topdir));
-							//st->st_dev = same as topdir
+							//st.st_dev = same as topdir
 							st.st_ino = 999; //big useless number
-							if(strncmp(row[6], "1") == 0, strncmp(row[6], "2") == 0) {
-								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFLNK;
+							if(strncmp(row[6], "1", 1) == 0 || strncmp(row[6], "2", 1) == 0) {
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFLNK;
 							}
 							else if(strcmp(row[0], "N") == 0) {
-								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
 							}
 							else {
-								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
 							}
 							st.st_nlink = 0;
 							st.st_uid = 0 + strtoll(row[4], NULL, 10);
@@ -674,25 +729,27 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	// path is /TarArchive.tar/more
 	else {
 		/* Seperate mysql queries for different filetypes */
+		printf("DEBUG READDIR: readdir on archive.tar/more\n");
 		//no file extension
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
 		else if(strcmp(".tar", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from UncompTar WHERE ArchiveName = '%s' AND MemberPath = '%s%s/'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.bz2 //TODO add other forms of bz2 extention
 		else if(strcmp(".bz2", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from Bzip2_files WHERE ArchiveName = '%s' AND MemberPath = '%s%s/'", archivename, within_tar_path, within_tar_filename);
 		}
 		//.xz or .txz
 		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s'", archivename, within_tar_path, within_tar_filename);
+			sprintf(insQuery, "SELECT DirFlag, MemberLength, MemberName, Mode, Uid, Gid, LinkFlag from CompXZ WHERE ArchiveName = '%s' AND MemberPath = '%s%s/'", archivename, within_tar_path, within_tar_filename);
 		}
 		//unrecognized file extension
 		else errornumber = -ENOENT;
 
 		//if no error send query and use result
 		if(errornumber == 0) {
+			printf("DEBUG READDIR: sending query %s\n", insQuery);
 			if(mysql_query(con, insQuery)) {
 				//query error
 				errornumber = -ENOENT;
@@ -704,6 +761,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
+						printf("DEBUG READDIR: NO RESULTS\n");
 						//no results
 						errornumber = 0;
 					}
@@ -716,14 +774,14 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 							memcpy(&st, &topdir, sizeof(topdir));
 							//st.st_dev = same as topdir
 							st.st_ino = 999; //big useless number
-							if(strncmp(row[6], "1") == 0, strncmp(row[6], "2") == 0) {
-								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFLNK;
+							if(strncmp(row[6], "1", 1) == 0 || strncmp(row[6], "2", 1) == 0) {
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFLNK;
 							}
 							else if(strcmp(row[0], "N") == 0) {
-								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFREG;
 							}
 							else {
-								stbuf->st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
+								st.st_mode = 0 + strtol(row[3], NULL, 10) + S_IFDIR;
 							}
 							st.st_nlink = 0;
 							st.st_uid = 0 + strtoll(row[4], NULL, 10);
@@ -1051,7 +1109,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		long long int archiveid = 0 + fi->fd; //get archive id from file_info
+		long long int archiveid = 0 + fi->fh; //get archive id from file_info
 		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveID = %lld", archiveid);
 		if(mysql_query(con, insQuery)) {
 			//query error
@@ -1085,8 +1143,8 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 							if (fi_des == -1)
 								errornumber = -errno;
 							else {
-								if (pread(fi_des, buf, size, offset) == -1) res = -errno;
-								close(fd);
+								if (pread(fi_des, buf, size, offset) == -1) errornumber = -errno;
+								close(fi_des);
 							}
 						}
 					}
