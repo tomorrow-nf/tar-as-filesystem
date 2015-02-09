@@ -25,8 +25,12 @@
 #endif
 #include "sqloptions.h"
 #include "bzip_seek/bitmapstructs.h" //this is just for the blockmap struct
-//#include "common_functions.h"
-//#include "xzfuncs.h"
+#include "common_functions.h"
+#include "xzfuncs.h"
+
+#define TARFLAG 0
+#define BZ2FLAG 1
+#define XZFLAG 2
 
 /*
 TAR-Browser: File system in userspace to examine the contents
@@ -107,42 +111,90 @@ void parsepath(const char *path, char** archivename, char** filepath, char** fil
 	free(tmpstr);
 }
 
-/*
-char* readfrom_xz(char* filename, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
+
+// similar to grab_block() for XZ, but for bzip2. Decompresses a single block into a buffer
+void* getblock_bzip(char* filename, int blocknum, struct blockmap* offsets) {
+    
+    void* blockbuf = (char*) malloc(((offsets->blocklocations)[blocknum]).uncompressedSize); // Build a buffer to hold a single block
+
+    // Read a single block into the buffer
+    int err = uncompressblock( filename, ((offsets->blocklocations)[blocknum]).position,
+                        blockbuf );
+
+    if (!err){
+        return blockbuf;
+    }
+    else {
+        return NULL;
+    }
+}
+
+
+// NOTE FOR KYLE: I've implemented a quick definition for "filetype"
+// This is to prevent the slight overhead from strcmp() and to be lazy.
+// TARFLAG = 0, BZ2FLAG = 1, XZFLAG = 2
+// I've also combined the functionality of XZ and BZ2 reads into this one function, as the code
+// was more or less identical except for grab_block() vs getblock_bzip(). Just pass in the type when calling this
+// Delete this comment after you've read it
+int read_compressed(char* filename, int filetype, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
 
 	long long int bytes_to_read = size;
-	char* block = grab_block(blocknum, filename);
+	char* block = NULL;
+
+	// Check file type, then use the appropriate function to grab a block
+	if (filetype == XZFLAG){
+		block = grab_block(blocknum, filename);
+	}
+	else if (filetype == BZ2FLAG){
+		block = getblock_bzip(filename, blocknum, offsets);
+	}
+	
 	char* location = block;
 	location = location + offset;
 	int current_blocknum = blocknum;
 
+	// make sure this block exists
 	if(block == NULL) {
 		return -EIO;
 	}
 	
-	long long int dataremaining_in_block = ((offsets->blocklocations)[current_blocknum]).uncompressedSize - offset;
+	// convenience
+	long long int data_left = ((offsets->blocklocations)[current_blocknum]).uncompressedSize - offset;
 	
-	int done = 1;
-	while(done) {
-		if(dataremaining_in_block > bytes_to_read)
+	while(1) {
+		// Check if this is the last block to read from
+		if(data_left > bytes_to_read) {
 			memcpy(outbuf, location, bytes_to_read);
 			free(block);
 			break;
+		}
 		else {
-			memcpy(outbuf, location, dataremaining_in_block);
-			bytes_to_read = bytes_to_read - dataremaining_in_block;
-			location = location + dataremaining_in_block;
+			// For all blocks except the last, copy everything from the block into
+			// the buffer, update location info, then work with the next block
+			memcpy(outbuf, location, data_left);
+			bytes_to_read = bytes_to_read - data_left;
+			location = location + data_left;
 			free(block);
 			current_blocknum++;
-			block = grab_block(current_blocknum, filename);
+
+			// Check file type, then use the appropriate function to grab a block again
+			if (filetype == XZFLAG){
+				block = grab_block(current_blocknum, filename);
+			}
+			else if (filetype == BZ2FLAG){
+				block = getblock_bzip(filename, current_blocknum, offsets);
+			}
+			
+			// If this is the last block or the next is corrupted, error
 			if(block == NULL) return -EIO;
-			dataremaining_in_block = ((offsets->blocklocations)[current_blocknum]).uncompressedSize;
+			data_left = ((offsets->blocklocations)[current_blocknum]).uncompressedSize;
 		}
 	}
 
 	return 0;
 }
-*/
+
+
 
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)

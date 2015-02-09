@@ -12,6 +12,7 @@
 #define PREFIXSIZE (sizeof(char) * 155)
 #define BLOCKSIZE (sizeof(char) * 512)
 
+
 // www.mkssoftware.com/docs/man4/tar.4.asp
 struct headerblock {
 	char name[100];
@@ -39,8 +40,6 @@ int analyze_tarfile(char* f_name, struct stat filestats);
 int analyze_bz2(char* f_name, struct stat filestats);
 //int analyze_gzip(char* f_name, struct stat filestats);
 int analyze_xz(char* f_name, struct stat filestats);
-
-int extract_xz_member(char* filename, int blocknum, long long int offset, long long int size);
 
 
 
