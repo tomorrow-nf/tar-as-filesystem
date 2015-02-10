@@ -130,12 +130,11 @@ void* getblock_bzip(char* filename, int blocknum, struct blockmap* offsets) {
 }
 
 
-// NOTE FOR KYLE: I've implemented a quick definition for "filetype"
+// I've implemented a quick definition for "filetype"
 // This is to prevent the slight overhead from strcmp() and to be lazy.
 // TARFLAG = 0, BZ2FLAG = 1, XZFLAG = 2
 // I've also combined the functionality of XZ and BZ2 reads into this one function, as the code
 // was more or less identical except for grab_block() vs getblock_bzip(). Just pass in the type when calling this
-// Delete this comment after you've read it
 int read_compressed(char* filename, int filetype, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
 
 	long long int bytes_to_read = size;
@@ -1155,8 +1154,13 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	char* file_ext = NULL;
 	parsepath(path, &archivename, &within_tar_path, &within_tar_filename, &file_ext);
 	char insQuery[1000];
+
+	// read specific variables
+	char path_to_archive[5000]; //stored path to the real location of the archive
 	struct blockmap* block_offsets = (struct blockmap*) malloc(sizeof(struct blockmap));
-	block_offsets->blocklocations = NULL;
+	block_offsets->blocklocations = NULL; // map of blocks in archive
+	off_t real_offset; // offset of file within block + offset from beginning of file
+	size_t real_size; // the real amount to read min("size" , "filesize - offset")
 	
 
 	// path is "/"
@@ -1195,7 +1199,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 						}
 						// open and read file
 						else {
-							int fi_des = open(path, O_RDONLY);
+							int fi_des = open(row[0], O_RDONLY);
 							if (fi_des == -1)
 								errornumber = -errno;
 							else {
@@ -1211,59 +1215,105 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	}
 	// path is /TarArchive.tar/more
 	else {
-		/* Load Blockmap ******************************************************/
-		int needBlockmap = 0;
-		//no file extension
-		if(file_ext == NULL) errornumber = -ENOENT;
-		//.tar
-		else if(strcmp(".tar", file_ext) == 0) {
-			needBlockmap = 0;
+		/* Get Archive's real path ********************************************/
+		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
+		if(mysql_query(con, insQuery)) {
+			//query error
+			errornumber = -ENOENT;
 		}
-		//.bz2 //TODO add other forms of bz2 extention
-		else if(strcmp(".bz2", file_ext) == 0) {
-			needBlockmap = 1;
-			sprintf(insQuery, "SELECT Blocknumber, BlockOffset, BlockSize from Bzip2_blocks WHERE ArchiveName = '%s'", archivename);
-		}
-		//.xz or .txz
-		else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-			needBlockmap = 1;
-			sprintf(insQuery, "SELECT Blocknumber, BlockOffset, BlockSize from CompXZ_blocks WHERE ArchiveName = '%s'", archivename);
-		}
-		//unrecognized file extension
-		else errornumber = -ENOENT;
-
-		//if no error and we need a blockmap send query and use result
-		if(errornumber == 0 && needBlockmap == 1) {
-			if(mysql_query(con, insQuery)) {
-				//query error
+		else {
+			MYSQL_RES* result = mysql_store_result(con);
+			if(result == NULL) {
 				errornumber = -ENOENT;
 			}
 			else {
-				MYSQL_RES* result = mysql_store_result(con);
-				if(result == NULL) {
-					errornumber = 0;
+				if(mysql_num_rows(result) == 0) {
+					//file does not exist, set not found error
+					errornumber = -ENOENT;
 				}
 				else {
-					int number_of_results = mysql_num_rows(result);
-					if(number_of_results == 0) {
-						//no results
-						errornumber = -ENOENT;
+					MYSQL_ROW row = mysql_fetch_row(result);
+					struct stat statbuff;
+					if(lstat(row[0], &statbuff) == -1) {
+						errornumber = -errno;
 					}
+					//check timestamp
 					else {
-						//while there are rows to be fetched
-						block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * (number_of_results + 1));
-						block_offsets->maxsize = (number_of_results + 1);
-						MYSQL_ROW row;
-						while((row = mysql_fetch_row(result))) {
-							//TODO fill blockmap
+						char* mod_time = ctime(&(statbuff.st_mtime));
+						if(strcmp(row[1], mod_time) != 0) {
+							errornumber = -ENOENT;
+						}
+						// copy filepath to easy location
+						else {
+							strcpy(path_to_archive, row[0]);
 						}
 					}
-					mysql_free_result(result);
+				}
+				mysql_free_result(result);
+			}
+		}
+
+		/* Load Blockmap ******************************************************/
+		if(errornumber == 0) {
+			int needBlockmap = 0;
+			//no file extension
+			if(file_ext == NULL) errornumber = -ENOENT;
+			//.tar
+			else if(strcmp(".tar", file_ext) == 0) {
+				needBlockmap = 0;
+			}
+			//.bz2 //TODO add other forms of bz2 extention
+			else if(strcmp(".bz2", file_ext) == 0) {
+				needBlockmap = 1;
+				sprintf(insQuery, "SELECT Blocknumber, BlockOffset, BlockSize from Bzip2_blocks WHERE ArchiveName = '%s'", archivename);
+			}
+			//.xz or .txz
+			else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+				needBlockmap = 1;
+				sprintf(insQuery, "SELECT Blocknumber, BlockOffset, BlockSize from CompXZ_blocks WHERE ArchiveName = '%s'", archivename);
+			}
+			//unrecognized file extension
+			else errornumber = -ENOENT;
+	
+			//if no error and we need a blockmap send query and use result
+			if(errornumber == 0 && needBlockmap == 1) {
+				if(mysql_query(con, insQuery)) {
+					//query error
+					errornumber = -ENOENT;
+				}
+				else {
+					MYSQL_RES* result = mysql_store_result(con);
+					if(result == NULL) {
+						errornumber = 0;
+					}
+					else {
+						int number_of_results = mysql_num_rows(result);
+						if(number_of_results == 0) {
+							//no results
+							errornumber = -ENOENT;
+						}
+						else {
+							//while there are rows to be fetched
+							block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * (number_of_results + 10)); //slightly too large to be safe
+							block_offsets->maxsize = (number_of_results + 10);
+							MYSQL_ROW row;
+							while((row = mysql_fetch_row(result))) {
+								long int this_block_num = strtol(row[0], NULL, 10);
+								unsigned long long this_pos = strtoull(row[1], NULL, 10);
+								unsigned long long this_unC_size = strtoull(row[2], NULL, 10);
+								((offsets->blocklocations)[this_block_num]).position = this_pos;
+								((offsets->blocklocations)[this_block_num]).uncompressedSize = this_unC_size;
+							}
+						}
+						mysql_free_result(result);
+					}
 				}
 			}
 		}
 
-		//TODO continue read
+		/*TODO get info about file you want to extract ********************/
+
+		
 		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
