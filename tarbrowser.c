@@ -1284,7 +1284,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 				else {
 					MYSQL_RES* result = mysql_store_result(con);
 					if(result == NULL) {
-						errornumber = 0;
+						errornumber = -ENOENT;
 					}
 					else {
 						int number_of_results = mysql_num_rows(result);
@@ -1293,6 +1293,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 							errornumber = -ENOENT;
 						}
 						else {
+							MYSQL_ROW row;
 							//while there are rows to be fetched
 							block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * (number_of_results + 10)); //slightly too large to be safe
 							block_offsets->maxsize = (number_of_results + 10);
@@ -1311,10 +1312,68 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 			}
 		}
 
-		/*TODO get info about file you want to extract ********************/
-
+		/************** get info about file you want to extract and do the read *******/
+		if(errornumber == 0) {
+			long long int files_id = 0 + fi->fh; //get archive id from file_info
+			//no file extension
+			if(file_ext == NULL) errornumber = -ENOENT;
+			//.tar
+			else if(strcmp(".tar", file_ext) == 0) {
+				sprintf(insQuery, "SELECT GBoffset, BYTEoffset, MemberLength from UncompTar WHERE FileID = %lld", files_id);
+				if(mysql_query(con, insQuery)) {
+					//query error
+					errornumber = -ENOENT;
+				}
+				else {
+					MYSQL_RES* result = mysql_store_result(con);
+					if(result == NULL) {
+						errornumber = 0;
+					}
+					else {
+						if(mysql_num_rows(result) == 0) {
+							//no results
+							errornumber = -ENOENT;
+						}
+						else {
+							MYSQL_ROW row;
+							row = mysql_fetch_row(result);
+							unsigned long long length_of_file = strtoull(row[2], NULL, 10);
+							//check if offset puts us outside file range
+							if(offset >= length_of_file) errornumber = -ENXIO;
+							else {
+								//calculate real offset in tarfile
+								real_offset = (strtoull(row[0], NULL, 10) * BYTES_IN_GB) + strtoull(row[1], NULL, 10) + offset;
+								//calculate real size to be read
+								real_size = length_of_file - offset;
+								if(size < real_size) {
+									real_size = size;
+								}
+								
+								int fi_des = open(path_to_archive, O_RDONLY);
+								if (fi_des == -1)
+									errornumber = -errno;
+								else {
+									if (pread(fi_des, buf, real_size, real_offset) == -1) errornumber = -errno;
+									close(fi_des);
+								}
+							}
+						}
+						mysql_free_result(result);
+					}
+				}
+			}
+			//TODO.bz2 //TODO add other forms of bz2 extention
+			else if(strcmp(".bz2", file_ext) == 0) {
+				sprintf(insQuery, "SELECT ? from Bzip2_files WHERE FileID = %lld", files_id);
+			}
+			//TODO.xz or .txz
+			else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+				sprintf(insQuery, "SELECT ? from CompXZ WHERE FileID = %lld", files_id);
+			}
+			//unrecognized file extension
+			else errornumber = -ENOENT;
+		}
 		
-		errornumber = -EACCES;
 	}
 	//free possible mallocs and mysql connection
 	mysql_close(con);
