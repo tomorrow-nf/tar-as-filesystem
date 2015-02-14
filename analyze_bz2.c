@@ -438,7 +438,7 @@ printf("READING INTO LINKNAME\n");
 		printf("REAL MEMBERNAME: %s\n", membername_file);
 
 		// Build the query and submit it
-		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, '%s', '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, header.size, header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
+		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, %llu, '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, strtoull(header.size, NULL, 8), header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
 		if(mysql_query(con, insQuery)) {
 			printf("Insert error:\n%s\n", mysql_error(con));
 			printf("%s\n", insQuery);

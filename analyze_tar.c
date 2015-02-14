@@ -283,7 +283,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
-				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, '%s', '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, header.size, header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
+				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, %llu, '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, strtoull(header.size, NULL, 8), header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
 				if(mysql_query(con, insQuery)) {
 					printf("Insert error:\n%s\n", mysql_error(con));
 					printf("%s\n", insQuery);

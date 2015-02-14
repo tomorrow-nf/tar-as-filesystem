@@ -216,7 +216,7 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		errornumber = -EACCES;
+		errornumber = -EIO;
 		return errornumber;
 	}
 
@@ -236,12 +236,12 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
-			errornumber = -ENOENT;
+			errornumber = -EIO;
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = -EACCES;
+				errornumber = -EIO;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -291,12 +291,12 @@ static int tar_getattr(const char *path, struct stat *stbuf)
 		if(errornumber == 0) {
 			if(mysql_query(con, insQuery)) {
 				//query error
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				MYSQL_RES* result = mysql_store_result(con);
 				if(result == NULL) {
-					errornumber = -EACCES;
+					errornumber = -EIO;
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
@@ -356,7 +356,7 @@ static int tar_access(const char *path, int mask)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		errornumber = -EACCES;
+		errornumber = -EIO;
 		return errornumber;
 	}
 
@@ -383,12 +383,12 @@ static int tar_access(const char *path, int mask)
 		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
-			errornumber = -ENOENT;
+			errornumber = -EIO;
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = -EACCES;
+				errornumber = -EIO;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -446,12 +446,12 @@ static int tar_access(const char *path, int mask)
 		if(errornumber == 0) {
 			if(mysql_query(con, insQuery)) {
 				//query error
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				MYSQL_RES* result = mysql_store_result(con);
 				if(result == NULL) {
-					errornumber = -ENOENT;
+					errornumber = -EIO;
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
@@ -516,7 +516,7 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		errornumber = -EACCES;
+		errornumber = -EIO;
 		return errornumber;
 	}
 
@@ -559,12 +559,12 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 		if(errornumber == 0) {
 			if(mysql_query(con, insQuery)) {
 				//query error
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				MYSQL_RES* result = mysql_store_result(con);
 				if(result == NULL) {
-					errornumber = -EACCES;
+					errornumber = -EIO;
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
@@ -655,7 +655,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		errornumber = 0;
+		errornumber = -EIO;
 		return errornumber;
 	}
 
@@ -670,13 +670,13 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if(archivename == NULL) {
 		sprintf(insQuery, "SELECT ArchiveName, ArchivePath, Timestamp from ArchiveList");
 		if(mysql_query(con, insQuery)) {
-			//query error, just stop and return nothing
-			errornumber = 0;
+			//query error
+			errornumber = -EIO;
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = 0;
+				errornumber = -EIO;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -707,7 +707,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	}
 	// path is "/TarArchive.tar" or "/TarArchive.tar.bz2" or "/TarArchive.tar.xz"
 	else if(within_tar_path == NULL) {
-		printf("DEBUG READDIR: readdir on archive.tar\n");
+		//printf("DEBUG READDIR: readdir on archive.tar\n");
 		/* Seperate mysql queries for different filetypes */
 		//no file extension
 		if(file_ext == NULL) errornumber = -ENOENT;
@@ -728,19 +728,19 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 		//if no error send query and use result
 		if(errornumber == 0) {
-			printf("DEBUG READDIR: sending query %s\n", insQuery);
+			//printf("DEBUG READDIR: sending query %s\n", insQuery);
 			if(mysql_query(con, insQuery)) {
 				//query error
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				MYSQL_RES* result = mysql_store_result(con);
 				if(result == NULL) {
-					errornumber = 0;
+					errornumber = -EIO;
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
-						printf("DEBUG READDIR: NO RESULTS\n");
+						//printf("DEBUG READDIR: NO RESULTS\n");
 						//no results
 						errornumber = 0;
 					}
@@ -781,7 +781,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	// path is /TarArchive.tar/more
 	else {
 		/* Seperate mysql queries for different filetypes */
-		printf("DEBUG READDIR: readdir on archive.tar/more\n");
+		//printf("DEBUG READDIR: readdir on archive.tar/more\n");
 		//no file extension
 		if(file_ext == NULL) errornumber = -ENOENT;
 		//.tar
@@ -801,19 +801,19 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 		//if no error send query and use result
 		if(errornumber == 0) {
-			printf("DEBUG READDIR: sending query %s\n", insQuery);
+			//printf("DEBUG READDIR: sending query %s\n", insQuery);
 			if(mysql_query(con, insQuery)) {
 				//query error
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				MYSQL_RES* result = mysql_store_result(con);
 				if(result == NULL) {
-					errornumber = 0;
+					errornumber = -EIO;
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
-						printf("DEBUG READDIR: NO RESULTS\n");
+						//printf("DEBUG READDIR: NO RESULTS\n");
 						//no results
 						errornumber = 0;
 					}
@@ -993,7 +993,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		errornumber = -EACCES;
+		errornumber = -EIO;
 		return errornumber;
 	}
 
@@ -1013,12 +1013,12 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 		sprintf(insQuery, "SELECT ArchivePath, Timestamp, ArchiveID from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
-			errornumber = -ENOENT;
+			errornumber = -EIO;
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = -EACCES;
+				errornumber = -EIO;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -1038,7 +1038,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 							errornumber = -ENOENT;
 						}
 						//check fi->flags for read only
-						else if(fi->flags != O_RDONLY) {
+						else if((fi->flags & O_ACCMODE) != O_RDONLY) {
 							errornumber = -EACCES;
 						}
 						else fi->fh = 0 + strtoll(row[2], NULL, 10);
@@ -1072,12 +1072,12 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 		if(errornumber == 0) {
 			if(mysql_query(con, insQuery)) {
 				//query error
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				MYSQL_RES* result = mysql_store_result(con);
 				if(result == NULL) {
-					errornumber = -ENOENT;
+					errornumber = -EIO;
 				}
 				else {
 					if(mysql_num_rows(result) == 0) {
@@ -1092,7 +1092,8 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 						}
 						else {
 							//file, only reading allowed
-							if(fi->flags != O_RDONLY) {
+							if((fi->flags & O_ACCMODE) != O_RDONLY) {
+								printf("DEBUG, not read only\n");
 								errornumber = -EACCES;
 							}
 							//set file handle to ID
@@ -1114,7 +1115,7 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 
 	return errornumber;
 }
-// TODO: read “size” bytes from the file after moving 
+// read “size” bytes from the file after moving 
 // “offset” through the file, use math to determine the block
 static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	struct fuse_file_info *fi)
@@ -1144,7 +1145,7 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	if(!mysql_real_connect(con, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		//exit, connection failed
 		mysql_close(con);
-		errornumber = -EACCES;
+		errornumber = -EIO;
 		return errornumber;
 	}
 
@@ -1173,12 +1174,12 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveID = %lld", archiveid);
 		if(mysql_query(con, insQuery)) {
 			//query error
-			errornumber = -ENOENT;
+			errornumber = -EIO;
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -1219,12 +1220,12 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 		sprintf(insQuery, "SELECT ArchivePath, Timestamp from ArchiveList WHERE ArchiveName = '%s'", archivename);
 		if(mysql_query(con, insQuery)) {
 			//query error
-			errornumber = -ENOENT;
+			errornumber = -EIO;
 		}
 		else {
 			MYSQL_RES* result = mysql_store_result(con);
 			if(result == NULL) {
-				errornumber = -ENOENT;
+				errornumber = -EIO;
 			}
 			else {
 				if(mysql_num_rows(result) == 0) {
@@ -1279,12 +1280,12 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 			if(errornumber == 0 && needBlockmap == 1) {
 				if(mysql_query(con, insQuery)) {
 					//query error
-					errornumber = -ENOENT;
+					errornumber = -EIO;
 				}
 				else {
 					MYSQL_RES* result = mysql_store_result(con);
 					if(result == NULL) {
-						errornumber = -ENOENT;
+						errornumber = -EIO;
 					}
 					else {
 						int number_of_results = mysql_num_rows(result);
@@ -1321,12 +1322,12 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 				sprintf(insQuery, "SELECT GBoffset, BYTEoffset, MemberLength from UncompTar WHERE FileID = %lld", files_id);
 				if(mysql_query(con, insQuery)) {
 					//query error
-					errornumber = -ENOENT;
+					errornumber = -EIO;
 				}
 				else {
 					MYSQL_RES* result = mysql_store_result(con);
 					if(result == NULL) {
-						errornumber = 0;
+						errornumber = -EIO;
 					}
 					else {
 						if(mysql_num_rows(result) == 0) {
@@ -1352,7 +1353,10 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 								if (fi_des == -1)
 									errornumber = -errno;
 								else {
-									if (pread(fi_des, buf, real_size, real_offset) == -1) errornumber = -errno;
+									unsigned long long Re = pread(fi_des, buf, real_size, real_offset);
+									if (Re == -1) errornumber = -errno;
+									else errornumber = Re;
+									
 									close(fi_des);
 								}
 							}
@@ -1374,12 +1378,12 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 				}
 				if(mysql_query(con, insQuery)) {
 					//query error
-					errornumber = -ENOENT;
+					errornumber = -EIO;
 				}
 				else {
 					MYSQL_RES* result = mysql_store_result(con);
 					if(result == NULL) {
-						errornumber = 0;
+						errornumber = -EIO;
 					}
 					else {
 						if(mysql_num_rows(result) == 0) {
@@ -1395,8 +1399,8 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 							else {
 								//find real block and real offset
 								long long blocknumber = strtoll(row[0], NULL, 10);
-								unsigned long long inside_offset = strtoull(row[1], NULL, 10);
-								unsigned long long data_remaining = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize - inside_offset;
+								unsigned long long real_offset = 0 + strtoull(row[1], NULL, 10);
+								unsigned long long data_remaining = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize - real_offset;
 								
 								//calculate real size to be read
 								real_size = length_of_file - offset;
@@ -1406,6 +1410,8 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 
 								//move real_offset foward by "offset"
 								unsigned long long remaining_seek = 0 + offset;
+								printf("remaining_seek: %llu\n", remaining_seek);
+								printf("blocknumber: %lld\n", blocknumber);
 								while(remaining_seek > data_remaining) {
 									blocknumber++;
 									remaining_seek = remaining_seek - data_remaining;
@@ -1417,6 +1423,10 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 								}
 
 								//blocknumber and real_offset now point to the offset within the file desired by read
+								unsigned long long bn = 0+blocknumber;
+								unsigned long long ro = 0+real_offset;
+								unsigned long long rs = 0+real_size;
+								printf("block %llu, offset %llu, size %llu\n", bn, ro, rs);
 								errornumber = read_compressed(path_to_archive, fileflag, blocknumber, real_offset, real_size, buf, block_offsets);
 							}
 						}
