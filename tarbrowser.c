@@ -135,7 +135,7 @@ void* getblock_bzip(char* filename, int blocknum, struct blockmap* offsets) {
 // TARFLAG = 0, BZ2FLAG = 1, XZFLAG = 2
 // I've also combined the functionality of XZ and BZ2 reads into this one function, as the code
 // was more or less identical except for grab_block() vs getblock_bzip(). Just pass in the type when calling this
-int read_compressed(char* filename, int filetype, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
+long long int read_compressed(char* filename, int filetype, int blocknum, long long int offset, long long int size, char* outbuf, struct blockmap* offsets) {
 
 	long long int bytes_to_read = size;
 	char* block = NULL;
@@ -190,7 +190,7 @@ int read_compressed(char* filename, int filetype, int blocknum, long long int of
 		}
 	}
 
-	return 0;
+	return size;
 }
 
 
@@ -1297,13 +1297,12 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 							//while there are rows to be fetched
 							block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * (number_of_results + 10)); //slightly too large to be safe
 							block_offsets->maxsize = (number_of_results + 10);
-							MYSQL_ROW row;
 							while((row = mysql_fetch_row(result))) {
 								long int this_block_num = strtol(row[0], NULL, 10);
 								unsigned long long this_pos = strtoull(row[1], NULL, 10);
 								unsigned long long this_unC_size = strtoull(row[2], NULL, 10);
-								((offsets->blocklocations)[this_block_num]).position = this_pos;
-								((offsets->blocklocations)[this_block_num]).uncompressedSize = this_unC_size;
+								((block_offsets->blocklocations)[this_block_num]).position = this_pos;
+								((block_offsets->blocklocations)[this_block_num]).uncompressedSize = this_unC_size;
 							}
 						}
 						mysql_free_result(result);
@@ -1363,12 +1362,67 @@ static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 				}
 			}
 			//TODO.bz2 //TODO add other forms of bz2 extention
-			else if(strcmp(".bz2", file_ext) == 0) {
-				sprintf(insQuery, "SELECT ? from Bzip2_files WHERE FileID = %lld", files_id);
-			}
-			//TODO.xz or .txz
-			else if(strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
-				sprintf(insQuery, "SELECT ? from CompXZ WHERE FileID = %lld", files_id);
+			else if(strcmp(".bz2", file_ext) == 0 || strcmp(".xz", file_ext) == 0 || strcmp(".txz", file_ext) == 0) {
+				int fileflag;
+				if(strcmp(".bz2", file_ext) == 0) {
+					sprintf(insQuery, "SELECT Blocknumber, InsideOffset, MemberLength from Bzip2_files WHERE FileID = %lld", files_id);
+					fileflag = BZ2FLAG;
+				}
+				else {
+					sprintf(insQuery, "SELECT Blocknumber, InsideOffset, MemberLength from CompXZ WHERE FileID = %lld", files_id);
+					fileflag = XZFLAG;
+				}
+				if(mysql_query(con, insQuery)) {
+					//query error
+					errornumber = -ENOENT;
+				}
+				else {
+					MYSQL_RES* result = mysql_store_result(con);
+					if(result == NULL) {
+						errornumber = 0;
+					}
+					else {
+						if(mysql_num_rows(result) == 0) {
+							//no results
+							errornumber = -ENOENT;
+						}
+						else {
+							MYSQL_ROW row;
+							row = mysql_fetch_row(result);
+							unsigned long long length_of_file = strtoull(row[2], NULL, 10);
+							//check if offset puts us outside file range
+							if(offset >= length_of_file) errornumber = -ENXIO;
+							else {
+								//find real block and real offset
+								long long blocknumber = strtoll(row[0], NULL, 10);
+								unsigned long long inside_offset = strtoull(row[1], NULL, 10);
+								unsigned long long data_remaining = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize - inside_offset;
+								
+								//calculate real size to be read
+								real_size = length_of_file - offset;
+								if(size < real_size) {
+									real_size = size;
+								}
+
+								//move real_offset foward by "offset"
+								unsigned long long remaining_seek = 0 + offset;
+								while(remaining_seek > data_remaining) {
+									blocknumber++;
+									remaining_seek = remaining_seek - data_remaining;
+									data_remaining = ((block_offsets->blocklocations)[blocknumber]).uncompressedSize;
+									real_offset = 0;
+								}
+								if(remaining_seek != 0) {
+									real_offset = 0 + remaining_seek;
+								}
+
+								//blocknumber and real_offset now point to the offset within the file desired by read
+								errornumber = read_compressed(path_to_archive, fileflag, blocknumber, real_offset, real_size, buf, block_offsets);
+							}
+						}
+						mysql_free_result(result);
+					}
+				}
 			}
 			//unrecognized file extension
 			else errornumber = -ENOENT;
