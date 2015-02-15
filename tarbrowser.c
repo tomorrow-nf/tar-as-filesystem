@@ -643,7 +643,7 @@ static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	closedir(dp);
 	return 0; */
 
-	printf("\nDEBUG READDIR: entered - %s\n", path);
+	//printf("\nDEBUG READDIR: entered - %s\n", path);
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
