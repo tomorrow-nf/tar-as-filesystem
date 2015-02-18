@@ -16,7 +16,7 @@ int main() {
 	// connect
 	if(!mysql_real_connect(&mysql, NULL, NULL, NULL, NULL, 0, NULL, 0)) {
 		printf("Connection Failure: %s\n", mysql_error(&mysql));
-		printf("\nA database called 'Tarfiledb' must exist.\n");
+		printf("\nThe database specified in TarBrowserConnectOptions.cnf must exist.\n");
 		
 		mysql_close(&mysql);
 		return 1;
