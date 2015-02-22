@@ -14,7 +14,7 @@
 #include "common_functions.h"
 #include "sqloptions.h"
 
-int analyze_tar(char* f_name, struct stat filestats) {
+int analyze_tar(char* f_name, struct stat filestats, int show_output) {
 
     FILE* tarfile;
 	int GB_read = 0;         	  // number of gigabytes read so far
@@ -86,7 +86,6 @@ int analyze_tar(char* f_name, struct stat filestats) {
 			sprintf(insQuery, "SELECT * from ArchiveList WHERE ArchiveName = '%s'", real_filename);
 			if(mysql_query(con, insQuery)) {
 				printf("Select error:\n%s\n", mysql_error(con));
-				printf("%s\n", insQuery);
 				fclose(tarfile);
 				mysql_close(con);
 				return 1;
@@ -95,7 +94,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 			MYSQL_RES* result = mysql_store_result(con);
 			
 			if(mysql_num_rows(result) == 0) {
-				printf("File does not exist\n");
+				if(show_output) printf("File does not exist\n");
 				//file foes not exist, do nothing
 				mysql_free_result(result);
 			}
@@ -120,12 +119,12 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				else {
 					sprintf(insQuery, "DELETE FROM UncompTar WHERE ArchiveName = '%s'", real_filename);
 					if(mysql_query(con, insQuery)) {
-						printf("Delete error:\n%s\n", mysql_error(con));
+						if(show_output) printf("Delete error:\n%s\n", mysql_error(con));
 						dberror = 1;
 					}
 					sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
 					if(mysql_query(con, insQuery)) {
-						printf("Delete error:\n%s\n", mysql_error(con));
+						if(show_output) printf("Delete error:\n%s\n", mysql_error(con));
 						dberror = 1;
 					}
 				}
@@ -136,12 +135,12 @@ int analyze_tar(char* f_name, struct stat filestats) {
 			sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', '%s')", real_filename, fullpath, mod_time);
 
 			if(mysql_query(con, insQuery)) {
-				printf("Insert error:\n%s\n", mysql_error(con));
+				if(show_output) printf("Insert error:\n%s\n", mysql_error(con));
 				dberror = 1;
 			}
 			archive_id = mysql_insert_id(con);
 			if(archive_id == 0) {
-				printf("Archive Id error, was 0\n");
+				if(show_output) printf("Archive Id error, was 0\n");
 				dberror = 1;
 			}		
 
@@ -150,7 +149,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				the_link_is_long = 0;
 
 				// Evaluate the tar header
-				printf("member header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
+				if(show_output) printf("member header offset: %d GB and %ld bytes\n", GB_read, bytes_read);
 
 
 				//get tar header
@@ -159,21 +158,21 @@ int analyze_tar(char* f_name, struct stat filestats) {
 
 				// CHECK FOR ././@LongLink
 				if(strcmp(header.name, "././@LongLink") == 0) {
-					printf("found a LongLink\n");
+					if(show_output) printf("found a LongLink\n");
 
 					//get length of name in bytes
 					file_length = strtoll(header.size, NULL, 8);
-					printf("LongLink's length (int): %lld\n", file_length);
+					if(show_output) printf("LongLink's length (int): %lld\n", file_length);
 					
 					//read the real name
 					if(header.typeflag[0] == 'K') {
 						fread((void*)linkname, file_length, 1, tarfile);
-						printf("the target of the link is: %s\n", linkname);
+						if(show_output) printf("the target of the link is: %s\n", linkname);
 						the_link_is_long = 1;
 					}
 					else if(header.typeflag[0] == 'L') {
 						fread((void*)membername, file_length, 1, tarfile);
-						printf("the name of the member is: %s\n", membername);
+						if(show_output) printf("the name of the member is: %s\n", membername);
 						the_name_is_long = 1;
 					}
 					else {
@@ -190,21 +189,21 @@ int analyze_tar(char* f_name, struct stat filestats) {
 					bytes_read = bytes_read + sizeof(struct headerblock);
 				}
 				if(strcmp(header.name, "././@LongLink") == 0) {
-					printf("found a LongLink\n");
+					if(show_output) printf("found a LongLink\n");
 
 					//get length of name in bytes
 					file_length = strtoll(header.size, NULL, 8);
-					printf("LongLink's length (int): %lld\n", file_length);
+					if(show_output) printf("LongLink's length (int): %lld\n", file_length);
 					
 					//read the real name
 					if(header.typeflag[0] == 'K') {
 						fread((void*)linkname, file_length, 1, tarfile);
-						printf("the target of the link is: %s\n", linkname);
+						if(show_output) printf("the target of the link is: %s\n", linkname);
 						the_link_is_long = 1;
 					}
 					else if(header.typeflag[0] == 'L') {
 						fread((void*)membername, file_length, 1, tarfile);
-						printf("the name of the member is: %s\n", membername);
+						if(show_output) printf("the name of the member is: %s\n", membername);
 						the_name_is_long = 1;
 					}
 					else {
@@ -221,11 +220,11 @@ int analyze_tar(char* f_name, struct stat filestats) {
 					bytes_read = bytes_read + sizeof(struct headerblock);
 				}
 
-				printf("Reading real member's information\n");
+				if(show_output) printf("Reading real member's information\n");
 
 				//get length of file in bytes
 				file_length = strtoll(header.size, NULL, 8);
-				printf("member's data length (int): %lld\n", file_length);
+				if(show_output) printf("member's data length (int): %lld\n", file_length);
 
 				//get filename (if name was not long)
 				if(!the_name_is_long) {
@@ -237,7 +236,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				if(!the_link_is_long) {
 					strncpy(linkname, header.linkname, 100);
 				}
-				printf("link name: %s\n", linkname);
+				if(show_output) printf("link name: %s\n", linkname);
 
 				//convert to a name and directory path
 				char membername_path[5000];
@@ -270,8 +269,10 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				sprintf(membername_file, "%s", membername_ptr); //copy filename
 				*membername_ptr = '\0'; // truncate path string
 
-				printf("MEMBERNAME PATH: %s\n", membername_path);
-				printf("REAL MEMBERNAME: %s\n", membername_file);
+				if(show_output)  {
+					printf("MEMBERNAME PATH: %s\n", membername_path);
+					printf("REAL MEMBERNAME: %s\n", membername_file);
+				}
 
 				//reduce bytes read to below a gigabyte
 				if(bytes_read >= BYTES_IN_GB) {
@@ -280,13 +281,15 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				}
 
 				//print beginning point of data
-				printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
+				if(show_output) printf("data begins at %d GB and %ld bytes\n", GB_read, bytes_read);
 
 				// Build the query and submit it
 				sprintf(insQuery, "INSERT INTO UncompTar VALUES (0, %llu, '%s', '%s', '%s', %d, %ld, %llu, '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, GB_read, bytes_read, strtoull(header.size, NULL, 8), header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
 				if(mysql_query(con, insQuery)) {
-					printf("Insert error:\n%s\n", mysql_error(con));
-					printf("%s\n", insQuery);
+					if(show_output) {
+						printf("Insert error:\n%s\n", mysql_error(con));
+						printf("%s\n", insQuery);
+					}
 					dberror = 1;
 				}
 
@@ -325,7 +328,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 				}
 
 				//end printed info with newline
-				printf("\n");
+				if(show_output) printf("\n");
 
 				//check for end of archive
 				fread((void*)archive_end_check, sizeof(archive_end_check), 1, tarfile);
@@ -342,7 +345,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 					printf("Rollback error:\n%s\n", mysql_error(con));
 				}
 				else {
-					printf("Entries rolled back\n");
+					printf("Error Occured: Entries rolled back\n");
 				}
 			}
 			else {
@@ -350,7 +353,7 @@ int analyze_tar(char* f_name, struct stat filestats) {
 					printf("Commit error:\n%s\n", mysql_error(con));
 				}
 				else {
-					printf("Entries committed\n");
+					if(show_output) printf("Entries committed\n");
 				}
 			}
 			fclose(tarfile);

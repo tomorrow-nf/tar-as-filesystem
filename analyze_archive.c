@@ -19,7 +19,7 @@ int ext_error(int err_type, char* error_string){
 			"Archive must have an appropriate file extension\n"
 			"----------------------------------\n"
 			"- Uncompressed TAR   archive: .tar\n"
-			"- Compressed   Bzip2 archive: .tar.bz2, .tbz, .tbz2\n"
+			"- Compressed   Bzip2 archive: .tar.bz2\n"
 			"- Compressed   XZ    archive: .tar.xz, .txz\n"
 			"----------------------------------\n", error_string);
 		return 1;
@@ -29,7 +29,7 @@ int ext_error(int err_type, char* error_string){
 			"Archive must have an appropriate file extension\n"
 			"----------------------------------\n"
 			"- Uncompressed TAR   archive: .tar\n"
-			"- Compressed   Bzip2 archive: .tar.bz2, .tbz, .tbz2\n"
+			"- Compressed   Bzip2 archive: .tar.bz2\n"
 			"- Compressed   XZ    archive: .tar.xz, .txz\n"
 			"----------------------------------\n", error_string);
 		return 1;
@@ -43,11 +43,17 @@ int main(int argc, char* argv[]) {
 	char* file_handle;	// .xz, .bz2, ect.
 	int problem_variable = 0;	// indicates error
 	struct stat filestats;	// important info about the file being analyzed
+	int show_output = 1;
 
 	// Check syntax
-	if (argc != 2){
+	if(argc == 3) {
+		if(strcmp(argv[2], "-q") == 0 || strcmp(argv[2], "-Q") == 0) {
+			show_output = 0;
+		}
+	}
+	else if (argc != 2){
 		printf("ERROR: Syntax\n"
-			"Expected: analyze_archive <archive file name>\n");
+			"Expected: analyze_archive <archive file name> <optional -q or -Q quiet flag>\n");
 		return 1;
 	}
 	filename = argv[1];
@@ -76,16 +82,16 @@ int main(int argc, char* argv[]) {
 
 	// Uncompressed tar archive
 	if(strcmp(file_handle, "tar") == 0) {
-		printf("ANALYZING %s ARCHIVE\n", file_handle);
-		problem_variable = analyze_tar(filename, filestats);
+		if(show_output) printf("ANALYZING %s ARCHIVE\n", file_handle);
+		problem_variable = analyze_tar(filename, filestats, show_output);
 	}
 	// bzip2
 	else if(strcmp(file_handle, "bz2") == 0) {
 		// Ensure that this is a tar.bz2, not just .bz2
 		file_handle = strrchr(filename, '.') - 3;
 		if(strcmp(file_handle, "tar.bz2") == 0) {
-			printf("ANALYZING %s ARCHIVE\n", file_handle);
-			problem_variable = analyze_bz2(filename, filestats);
+			if(show_output) printf("ANALYZING %s ARCHIVE\n", file_handle);
+			problem_variable = analyze_bz2(filename, filestats, show_output);
 		}
 		else return ext_error(2, filename);
 	}
@@ -93,8 +99,8 @@ int main(int argc, char* argv[]) {
 	else if(strcmp(file_handle, "xz") == 0 || strcmp(file_handle, "txz") == 0) {
 		file_handle = strrchr(filename, '.') - 3;
 		if(strcmp(file_handle, "tar.xz") == 0 || strcmp(file_handle, "txz") == 0) {
-			printf("ANALYZING %s ARCHIVE\n", file_handle);
-			problem_variable = analyze_xz(filename, filestats);
+			if(show_output) printf("ANALYZING %s ARCHIVE\n", file_handle);
+			problem_variable = analyze_xz(filename, filestats, show_output);
 		}
 		else return ext_error(2, filename);
 	}

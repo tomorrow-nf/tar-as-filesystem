@@ -154,7 +154,7 @@ void* grab_block(int blocknum, char* filename) {
 	return (void*) out_buf;
 }
 
-int fill_bitmap(char* filename, struct blockmap* offsets) {
+int fill_bitmap(char* filename, struct blockmap* offsets, int show_output) {
 
 	file_pair *pair = io_open_src(filename);
 	if (pair == NULL) {
@@ -167,9 +167,11 @@ int fill_bitmap(char* filename, struct blockmap* offsets) {
 	unsigned long long int streams = lzma_index_stream_count(xfi.idx);
 	unsigned long long int number_of_blocks = lzma_index_block_count(xfi.idx);
 	unsigned long long int uncomprsize = lzma_index_uncompressed_size(xfi.idx);
-	printf("streams: %llu\n", streams);
-	printf("blocks : %llu\n", number_of_blocks);
-	printf("unCsize: %llu\n\n", uncomprsize);
+	if(show_output) {
+		printf("streams: %llu\n", streams);
+		printf("blocks : %llu\n", number_of_blocks);
+		printf("unCsize: %llu\n\n", uncomprsize);
+	}
 
 	// if streams is not 1 error
 	if(streams != 1) {
@@ -187,8 +189,10 @@ int fill_bitmap(char* filename, struct blockmap* offsets) {
 		}
 		unsigned long long int blockno = iter.block.number_in_stream;
 		unsigned long long int uncompsz = iter.block.uncompressed_size;
-		printf("block  : %llu\n", blockno);
-		printf("unCsize: %llu\n", uncompsz);
+		if(show_output) {
+			printf("block  : %llu\n", blockno);
+			printf("unCsize: %llu\n", uncompsz);
+		}
 
 		if((offsets->maxsize - 10) <= blockno) {
 			offsets->maxsize = (offsets->maxsize * 2);

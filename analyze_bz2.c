@@ -30,7 +30,7 @@ void* getblock_bzip(char* filename, int blocknum, struct blockmap* offsets) {
 	}
 }
 
-int analyze_bz2(char* f_name, struct stat filestats) {
+int analyze_bz2(char* f_name, struct stat filestats, int show_output) {
 
 	long int bytes_read = 0; 		// total bytes read - (gigabytes read * bytes per gigabyte)
 	char* tar_filename = f_name; 	// file to analyze
@@ -67,7 +67,7 @@ int analyze_bz2(char* f_name, struct stat filestats) {
 	block_offsets->blocklocations = (struct blocklocation*) malloc(sizeof(struct blocklocation) * 200);
 	block_offsets->maxsize = 200;
 
-	int M_result = map_bzip2(tar_filename, block_offsets);
+	int M_result = map_bzip2(tar_filename, block_offsets, show_output);
         if(M_result != 0) {
 		printf("Error getting block sizes\n");
 		free(block_offsets->blocklocations);
@@ -123,7 +123,7 @@ int analyze_bz2(char* f_name, struct stat filestats) {
 	}
 	MYSQL_RES* result = mysql_store_result(con);
 	if(mysql_num_rows(result) == 0) {
-		printf("File is not in database\n");
+		if(show_output) printf("File is not in database\n");
 		//file foes not exist, do nothing
 		mysql_free_result(result);
 	}
@@ -144,22 +144,22 @@ int analyze_bz2(char* f_name, struct stat filestats) {
 			mysql_close(con);
 			free(block_offsets->blocklocations);
 			free(block_offsets);
-			return 0;
+			return 1;
 		}
 		else {
 			sprintf(insQuery, "DELETE FROM Bzip2_files WHERE ArchiveName = '%s'", real_filename);
 			if(mysql_query(con, insQuery)) {
-				printf("Delete error:\n%s\n", mysql_error(con));
+				if(show_output) printf("Delete error:\n%s\n", mysql_error(con));
 				dberror = 1;
 			}
 			sprintf(insQuery, "DELETE FROM Bzip2_blocks WHERE ArchiveName = '%s'", real_filename);
 			if(mysql_query(con, insQuery)) {
-				printf("Delete error:\n%s\n", mysql_error(con));
+				if(show_output) printf("Delete error:\n%s\n", mysql_error(con));
 				dberror = 1;
 			}
 			sprintf(insQuery, "DELETE FROM ArchiveList WHERE ArchiveName = '%s'", real_filename);
 			if(mysql_query(con, insQuery)) {
-				printf("Delete error:\n%s\n", mysql_error(con));
+				if(show_output) printf("Delete error:\n%s\n", mysql_error(con));
 				dberror = 1;
 			}
 		}
@@ -169,12 +169,12 @@ int analyze_bz2(char* f_name, struct stat filestats) {
 	char* mod_time = ctime(&(filestats.st_mtime));
 	sprintf(insQuery, "INSERT INTO ArchiveList VALUES (0, '%s', '%s', '%s')", real_filename, fullpath, mod_time);
 	if(mysql_query(con, insQuery)) {
-		printf("Insert error:\n%s\n", mysql_error(con));
+		if(show_output) printf("Insert error:\n%s\n", mysql_error(con));
 		dberror = 1;
 	}
 	archive_id = mysql_insert_id(con);
 	if(archive_id == 0) {
-		printf("Archive Id error, was 0\n");
+		if(show_output) printf("Archive Id error, was 0\n");
 		dberror = 1;
 	}
 
@@ -194,7 +194,7 @@ int analyze_bz2(char* f_name, struct stat filestats) {
 
 	while (1){
 		// TAR HEADER SECTION - get tar header
-printf("BEGINNING FILE ANALYSIS\n");
+		if(show_output) printf("BEGINNING FILE ANALYSIS\n");
 		the_name_is_long = 0;
 		the_link_is_long = 0;
 		
@@ -233,7 +233,7 @@ printf("BEGINNING FILE ANALYSIS\n");
 		int tmp_longlink_position = 0;
 		int position_incrementer = 0;
 		while(strcmp(header.name, "././@LongLink") == 0) {
-			printf("found a LongLink\n");
+			if(show_output) printf("found a LongLink\n");
 
 			//get length of name in bytes, adjust to be at end of block
 			file_length = strtoll(header.size, NULL, 8);
@@ -243,18 +243,18 @@ printf("BEGINNING FILE ANALYSIS\n");
 			else {
 				position_incrementer = file_length;
 			}
-			printf("LongLink's length (int): %lld\n", file_length);
+			if(show_output) printf("LongLink's length (int): %lld\n", file_length);
 
 			//copy longlink into proper area
 			if(remainingdata >= position_incrementer){
 				if(header.typeflag[0] == 'L') {
 					memcpy((void*) membername, (memblock + blockposition), file_length);
-printf("READING INTO MEMBERNAME\n");
+					if(show_output) printf("READING INTO MEMBERNAME\n");
 					the_name_is_long = 1;
 				}
 				else if(header.typeflag[0] == 'K') {
 					memcpy((void*) linkname, (memblock + blockposition), file_length);
-printf("READING INTO LINKNAME\n");
+					if(show_output) printf("READING INTO LINKNAME\n");
 					the_link_is_long = 1;
 				}
 				remainingdata = remainingdata - position_incrementer;
@@ -264,12 +264,12 @@ printf("READING INTO LINKNAME\n");
 				tmp_dataread = remainingdata;
 				if(header.typeflag[0] == 'L') {
 					memcpy((void*) membername, (memblock + blockposition), (sizeof(char) * remainingdata));
-printf("READING INTO MEMBERNAME\n");
+					if(show_output) printf("READING INTO MEMBERNAME\n");
 					the_name_is_long = 1;
 				}
 				else if(header.typeflag[0] == 'K') {
 					memcpy((void*) linkname, (memblock + blockposition), (sizeof(char) * remainingdata));
-printf("READING INTO LINKNAME\n");
+					if(show_output) printf("READING INTO LINKNAME\n");
 					the_link_is_long = 1;
 				}
 				free(memblock);
@@ -287,12 +287,12 @@ printf("READING INTO LINKNAME\n");
 
 				if(header.typeflag[0] == 'L') {
 					memcpy((void*)(((char*)membername) + tmp_dataread), (memblock + blockposition), (sizeof(char) * (file_length - tmp_dataread)));
-printf("READING INTO MEMBERNAME\n");
+					if(show_output) printf("READING INTO MEMBERNAME\n");
 					the_name_is_long = 1;
 				}
 				else if(header.typeflag[0] == 'K') {
 					memcpy((void*)(((char*)linkname) + tmp_dataread), (memblock + blockposition), (sizeof(char) * (file_length - tmp_dataread)));
-printf("READING INTO LINKNAME\n");
+					if(show_output) printf("READING INTO LINKNAME\n");
 					the_link_is_long = 1;
 				}
 				
@@ -332,20 +332,20 @@ printf("READING INTO LINKNAME\n");
 		if(!the_name_is_long) {
 			strncpy(membername, header.name, 100);
 		}
-		printf("member name: %s\n", membername);
+		if(show_output) printf("member name: %s\n", membername);
 
 		//get length of file in bytes
 		file_length = strtoll(header.size, NULL, 8);
-		printf("file length (int): %lld\n", file_length);
+		if(show_output) printf("file length (int): %lld\n", file_length);
 
 		//get link flag (1 byte)
-		printf("link flag: %c\n", header.typeflag[0]);
+		if(show_output) printf("link flag: %c\n", header.typeflag[0]);
 
 		//get linked filename (if flag set, otherwise this field is useless)
 		if(!the_link_is_long) {
 			strncpy(linkname, header.linkname, 100);
 		}
-		printf("link name: %s\n", linkname);
+		if(show_output) printf("link name: %s\n", linkname);
 
 
 		// SKIP DATA SECTION - note the offset and skip the data
@@ -364,7 +364,7 @@ printf("READING INTO LINKNAME\n");
 			longtmp = file_length;
 		}
 
-		printf("data begins in block %d, %ld bytes in\n", tmp_blocknumber, tmp_blockposition);
+		if(show_output) printf("data begins in block %d, %ld bytes in\n", tmp_blocknumber, tmp_blockposition);
 		if(file_length == 0) {
 			// do nothing
 		}
@@ -401,7 +401,7 @@ printf("READING INTO LINKNAME\n");
 			}
 			
 		}
-		printf("file exists in %d blocks\n", numblocks);
+		if(show_output) printf("file exists in %d blocks\n", numblocks);
 
 		//convert to a name and directory path
 		char membername_path[5000];
@@ -434,19 +434,20 @@ printf("READING INTO LINKNAME\n");
 		sprintf(membername_file, "%s", membername_ptr); //copy filename
 		*membername_ptr = '\0'; // truncate path string
 
-		printf("MEMBERNAME PATH: %s\n", membername_path);
-		printf("REAL MEMBERNAME: %s\n", membername_file);
+		if(show_output) {
+			printf("MEMBERNAME PATH: %s\n", membername_path);
+			printf("REAL MEMBERNAME: %s\n", membername_file);
+		}
 
 		// Build the query and submit it
 		sprintf(insQuery, "INSERT INTO Bzip2_files VALUES (0, %llu, '%s', '%s', '%s', %d, %llu, %ld, %llu, '%c', '%c', %ld, %ld, %ld, '%s')", archive_id, real_filename, membername_file, membername_path, tmp_blocknumber, ((block_offsets->blocklocations)[tmp_blocknumber]).position, tmp_blockposition, strtoull(header.size, NULL, 8), header.typeflag[0], dirflag, strtol(header.mode, NULL, 8), strtol(header.uid, NULL, 8), strtol(header.gid, NULL, 8), linkname);
 		if(mysql_query(con, insQuery)) {
-			printf("Insert error:\n%s\n", mysql_error(con));
-			printf("%s\n", insQuery);
+			if(show_output) printf("Insert error:\n%s\n", mysql_error(con));
 			dberror = 1;
 		}
 			
 		//end printed info with newline
-		printf("\n");
+		if(show_output) printf("\n");
 
 		// TEST ARCHIVE END SECTION - test for the end of the archive
 		//	-reminder: 	remainingdata: how much data is left in the block
@@ -526,11 +527,10 @@ printf("READING INTO LINKNAME\n");
 	//store the block map (blocknumber = the last block)
 	int b_cur = 1;
 	for(b_cur=1;b_cur<=blocknumber;b_cur++) {
-		printf("storing block %d\n", b_cur);
+		if(show_output) printf("storing block %d\n", b_cur);
 		sprintf(insQuery, "INSERT INTO Bzip2_blocks VALUES (%llu, '%s', %d, %llu, %llu)", archive_id, real_filename, b_cur, ((block_offsets->blocklocations)[b_cur]).position, ((block_offsets->blocklocations)[b_cur]).uncompressedSize);
 		if(mysql_query(con, insQuery)) {
-			printf("Insert error:\n%s\n", mysql_error(con));
-			printf("%s\n", insQuery);
+			if(show_output) printf("Insert error:\n%s\n", mysql_error(con));
 			dberror = 1;
 		}
 	}
@@ -538,10 +538,10 @@ printf("READING INTO LINKNAME\n");
 	//the file has been read, commit the transation and close the connection
 	if(dberror == 1) {
 		if(mysql_query(con, "ROLLBACK")) {
-			printf("Rollback error:\n%s\n", mysql_error(con));
+			printf("Database error: Rollback error:\n%s\n", mysql_error(con));
 		}
 		else {
-			printf("Entries rolled back\n");
+			printf("Database error: Entries rolled back\n");
 		}
 	}
 	else {
@@ -549,7 +549,7 @@ printf("READING INTO LINKNAME\n");
 			printf("Commit error:\n%s\n", mysql_error(con));
 		}
 		else {
-			printf("Entries committed\n");
+			if(show_output) printf("Entries committed\n");
 		}
 	}
 

@@ -5,6 +5,6 @@
 
 void* grab_block(int blocknum, char* filename);
 
-int fill_bitmap(char* filename, struct blockmap* offsets);
+int fill_bitmap(char* filename, struct blockmap* offsets, int show_output);
 
 #endif

@@ -11,7 +11,7 @@ struct blocklocation {
 	unsigned long long uncompressedSize;
 };
 
-int map_bzip2(char* filename, struct blockmap* offsets);
+int map_bzip2(char* filename, struct blockmap* offsets, int show_output);
 
 int uncompressblock( char* filename, unsigned long long position, void* buf );
 

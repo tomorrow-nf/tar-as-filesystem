@@ -36,11 +36,11 @@
 /* Function Form of the main
     -returns 0 on success
 */
-int map_bzip2(char* filename, struct blockmap* offsets)
+int map_bzip2(char* filename, struct blockmap* offsets, int show_output)
 {
     int tarfile = open(filename, O_RDONLY);
     if(tarfile < 0) {
-        printf("Unable to open file: %s\n", filename);
+        if(show_output) printf("Unable to open file: %s\n", filename);
         return 1;
     }
 
@@ -107,7 +107,7 @@ int map_bzip2(char* filename, struct blockmap* offsets)
 
             ((offsets->blocklocations)[kpdavidson_blockno]).position = position;
             ((offsets->blocklocations)[kpdavidson_blockno]).uncompressedSize = totalcount;
-            printf("Block %d at %llu Bits of size %d\n", kpdavidson_blockno, position, totalcount);
+            if(show_output) printf("Block %d at %llu Bits of size %d\n", kpdavidson_blockno, position, totalcount);
         }
     }
 

@@ -36,10 +36,10 @@ struct headerblock {
 
 long long int strtolonglong(char* string);
 
-int analyze_tarfile(char* f_name, struct stat filestats);
-int analyze_bz2(char* f_name, struct stat filestats);
-//int analyze_gzip(char* f_name, struct stat filestats);
-int analyze_xz(char* f_name, struct stat filestats);
+int analyze_tarfile(char* f_name, struct stat filestats, int show_output);
+int analyze_bz2(char* f_name, struct stat filestats, int show_output);
+//int analyze_gzip(char* f_name, struct stat filestats, int show_output);
+int analyze_xz(char* f_name, struct stat filestats, int show_output);
 
 
 
