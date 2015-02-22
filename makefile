@@ -43,24 +43,3 @@ list_xzfile.o: list_xzfile.c list_xzfile.h
 clean:
 	rm -f *.o tarbrowser analyze_archive prepareDatabase build/* temp/*
 	make clean -C bzip_seek
-
-######## below are temporary things that will be removed ################################
-
-extract_tar_member: extract_tar_member.o common_functions.o
-	gcc -o build/extract_tar_member build/extract_tar_member.o build/common_functions.o `mysql_config --libs`
-
-extract_bz2_member: bzip2map extract_bz2_member.o common_functions.o
-	gcc -o build/extract_bz2_member build/extract_bz2_member.o build/common_functions.o bzip_seek/micro-bunzip.o bzip_seek/seek-bunzip.o `mysql_config --libs`
-
-extract_tar_member.o: extract_tar_member.c common_functions.h
-	gcc -c `mysql_config --cflags` extract_tar_member.c -o build/extract_tar_member.o
-
-extract_bz2_member.o: extract_bz2_member.c common_functions.h
-	gcc -c `mysql_config --cflags` extract_bz2_member.c -o build/extract_bz2_member.o
-
-read_tar.o: read_tar.c common_functions.h
-	gcc -c `mysql_config --cflags` read_tar.c -o build/read_tar.o
-
-read_tar: read_tar.o common_functions.o
-	gcc -o build/read_tar build/read_tar.o build/common_functions.o `mysql_config --libs`
-
