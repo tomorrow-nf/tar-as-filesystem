@@ -1,6 +1,7 @@
 /*
     Will accept a tar file name and print out the files in the archive as well as their
     byte offsets and sizes (in bytes).
+    Can accept an optional -q or -Q argument to keep output to a minimum.
 */
 #include <stdio.h>
 #include <string.h>
