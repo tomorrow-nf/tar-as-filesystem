@@ -44,12 +44,8 @@ tar.xz archives, and tar.bz2 archives
 Developed by Kyle Davidson (kpdavidson@wpi.edu) and Tyler Morrow (tomorrow@wpi.edu)
 as an MQP project at Worcester Polytechnic Institute (2014-2015)
 
-Adapted from example FUSE file fusexmp.c, which holds the following
-copyright and license information:
-		Copyright (C) 2001-2007 Miklos Szeredi <miklos@szeredi.hu>
-		Copyright (C) 2011 Sebastian Pipping <sebastian@pipping.org>
-		This program can be distributed under the terms of the GNU GPL.
-		See the file COPYING.
+Released to the public domain.
+
 */
 
 //special variable to hold stats for top level directory
@@ -198,13 +194,6 @@ long long int read_compressed(char* filename, int filetype, int blocknum, long l
 // Fill stbuf structure similar to the lstat() function, some comes from lstat of the archive file, others come from database
 static int tar_getattr(const char *path, struct stat *stbuf)
 {	
-	//original code
-	/*int res;
-	res = lstat(path, stbuf);
-	if (res == -1)
-		return -errno;
-	return 0;*/
-
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
@@ -495,16 +484,6 @@ static int tar_access(const char *path, int mask)
 //takes a symbolic link and puts its referenced path in buf
 static int tar_readlink(const char *path, char *buf, size_t size)
 {
-	//original code
-	/*
-	int res;
-	res = readlink(path, buf, size - 1);
-	if (res == -1)
-		return -errno;
-	buf[res] = '\0';
-	return 0;
-	*/
-
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
@@ -618,31 +597,6 @@ static int tar_readlink(const char *path, char *buf, size_t size)
 static int tar_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	off_t offset, struct fuse_file_info *fi)
 {
-	//original code
-	/*
-	DIR *dp;
-	struct dirent *de;
-	(void) offset;
-	(void) fi;
-	dp = opendir(path);
-	if (dp == NULL)
-		return -errno;
-	while ((de = readdir(dp)) != NULL) {
-		struct stat st;
-		memset(&st, 0, sizeof(st));
-
-		//can get these 2 from using lstat on file
-		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12; 
-		
-		//buf : not touched
-		//de->d_name : a string name
-		if (filler(buf, de->d_name, &st, 0))
-			break;
-	}
-	closedir(dp);
-	return 0; */
-
 	//printf("\nDEBUG READDIR: entered - %s\n", path);
 	int errornumber = 0;
 
@@ -973,15 +927,6 @@ static int tar_utimens(const char *path, const struct timespec ts[2])
 // else return (-1 * ENOENT);
 static int tar_open(const char *path, struct fuse_file_info *fi)
 {
-	//original code
-	/*
-	int res;
-	res = open(path, fi->flags);
-	if (res == -1)
-		return -errno;
-	close(res);
-	return 0; */
-
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
@@ -1120,20 +1065,6 @@ static int tar_open(const char *path, struct fuse_file_info *fi)
 static int tar_read(const char *path, char *buf, size_t size, off_t offset,
 	struct fuse_file_info *fi)
 {
-	//original code
-	/*
-	int fd;
-	int res;
-	(void) fi;
-	fd = open(path, O_RDONLY);
-	if (fd == -1)
-		return -errno;
-	res = pread(fd, buf, size, offset);
-	if (res == -1)
-		res = -errno;
-	close(fd);
-	return res; */
-
 	int errornumber = 0;
 
 	// connect to database, begin a transaction
@@ -1463,15 +1394,6 @@ static int tar_write(const char *path, const char *buf, size_t size,
 // --we don't allow mounted filesystems within the our FUSE
 static int tar_statfs(const char *path, struct statvfs *stbuf)
 {
-	// original code
-	/*
-	int res;
-	res = statvfs(path, stbuf);
-	if (res == -1)
-		return -errno;
-	return 0;
-	*/
-
 	return -EACCES;
 }
 
